@@ -1,0 +1,2 @@
+slurmstepd: *** JOB 408317 CANCELLED AT 2014-11-24T15:05:03 *** on tiger-r14n4
+slurmstepd: _slurm_cgroup_destroy: problem deleting step cgroup path /cgroup/freezer/slurm/uid_88289/job_408317/step_batch: Device or resource busy
