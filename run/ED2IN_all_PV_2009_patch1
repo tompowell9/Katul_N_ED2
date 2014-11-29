@@ -371,7 +371,9 @@ $ED_NL
    !  NZS    - maximum number of snow/water pounding layers.  This is used only for        !
    !           snow, if only liquid water is standing, the water will be all collapsed     !
    !           into a single layer, so if you are running for places where it doesn't snow !
-   !           a lot, leave this set to 1.  One value for all grids.                       ! 
+   !           a lot, leave this set to 1.  One value for all grids.                       !
+   !  NLSL   - the bottom of the nutrient layer. All the nutrient (nitrogen) is assumed    !
+   !		   to concentrate in the top soil layers above NLSL (including NLSL)		   !
    !---------------------------------------------------------------------------------------!
    NL%NZG = 20
    NL%NZS = 3
