@@ -1981,7 +1981,7 @@ subroutine init_pft_mort_params()
    seedling_mortality(18:20)  = 0.95
    seedling_mortality(21)   = 0.95
    seedling_mortality(22)   = 0.95
-   seedling_mortality(23:35) = 1.00
+   seedling_mortality(23:35) = 0.95
 
    !seedling_mortality=0.critical height survivorship
    treefall_s_gtht(1:35)    = 0.0
