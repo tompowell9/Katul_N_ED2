@@ -92,6 +92,7 @@ Contains
        if(daylength < 15.)then
           csite%sum_cdd(ipa) = csite%sum_cdd(ipa) + &
                min(csite%avg_daily_temp(ipa)-283.15,0.)
+          print*,'avg daily tmeps',csite%avg_daily_temp(ipa)
        else
           csite%sum_cdd(ipa) = 0.0
        endif
@@ -149,6 +150,8 @@ Contains
           endif
        enddo
         ! Determine if there is leaf coloration.
+       write(*,*) "Our sum_chd right now is: ", csite%sum_chd(ipa)
+       write(*,*) "Our sum_dgd right now is: ", csite%sum_dgd(ipa)
        write(*,*) "Our sum_cdd right now is: ", csite%sum_cdd(ipa)
        do ipft = 1, n_pft
           ! Check if it is currently green.
@@ -190,19 +193,20 @@ Contains
           cpatch%leaf_drop(ico) = 0.0
           ipft = cpatch%pft(ico)
           
-          delta_bleaf = -9.9e9
+          !delta_bleaf = -9.9e9
+		  delta_bleaf = 0.
           !dropping leaves but not resorbed yet
           if(csite%phenophase(ipft,ipa) == 1)then
              if(phenology(ipft) == 0)then
                 bl_max = csite%green_leaf_factor(ipft,ipa) *   &
                      dbh2bl(cpatch%dbh(ico),ipft)
                 delta_bleaf = cpatch%bleaf(ico) - bl_max
-          !      cpatch%bleaf(ico) = min(cpatch%bleaf(ico),bl_max)
+               ! cpatch%bleaf(ico) = min(cpatch%bleaf(ico),bl_max)
              elseif(phenology(ipft) == 2)then
-           !     cpatch%phenology_status(ico) = 2
+               ! cpatch%phenology_status(ico) = 2
                 bl_max = 0.0
                 delta_bleaf = cpatch%bleaf(ico)
-           !     cpatch%bleaf(ico) = 0.0
+                !cpatch%bleaf(ico) = 0.0
              endif
           endif
 
@@ -210,78 +214,95 @@ Contains
              bl_max = csite%green_leaf_factor(ipft,ipa) *   &
                   dbh2bl(cpatch%dbh(ico),ipft)
              delta_bleaf = cpatch%bleaf(ico) - bl_max
-!             if(delta_bleaf >= 0.0)then
-!                cpatch%phenology_status(ico) = 0
-!                cpatch%bleaf(ico) = bl_max
-!             endif
+             if(delta_bleaf >= 0.0)then
+                cpatch%phenology_status(ico) = 0 !uncomment ATT
+               ! cpatch%bleaf(ico) = bl_max
+             endif
           endif
-         ! print*,'delta_bleaf',delta_bleaf
-          
-		 if(delta_bleaf < -1e-6) then!ATT
+
+          if(delta_bleaf < -1e-6) then!ATT
                       cpatch%phenology_status(ico) = 1
             else if (delta_bleaf > 1e-6) then
                       cpatch%phenology_status(ico) = -1 
-            else
+            else if (csite%green_leaf_factor(ipft,ipa) * cpatch%elongf(ico) >	0.9 * max_glf(ipft)) then
                       cpatch%phenology_status(ico) = 0
           end if!end ATT
-
+          
+         ! print*,'delta_bleaf',delta_bleaf
           if(delta_bleaf > 0.0)then
                cpatch%leaf_drop(ico) = (1.0 - C_resorption_factor(ipft)) * delta_bleaf
 
-               csite%fsc_in(ipa) = csite%fsc_in(ipa)                                       &
-                                 + cpatch%nplant(ico) * delta_bleaf              &
-                                 * f_labile(ipft) * f_fast(ipft) 						 &
-								 * (1. - C_resorption_factor(ipft))
-               csite%fsn_in(ipa) = csite%fsn_in(ipa)                                       &
-                                 + cpatch%nplant(ico) * delta_bleaf              &
-                                 * f_labile(ipft) * f_fast(ipft) / c2n_leaf(ipft)  &
-								 * (1. - N_resorption_factor(ipft))
-               csite%ssc_in(ipa) = csite%ssc_in(ipa)                                       &
-                                 + cpatch%nplant(ico) * delta_bleaf              &
-                                 * (1.0-f_labile(ipft)) 						 &
-								 * (1. - C_resorption_factor(ipft))
-               csite%ssl_in(ipa) = csite%ssl_in(ipa)                                       &
-                                 + cpatch%nplant(ico) * delta_bleaf              &
-                                 * (1.0 - f_labile(ipft)) * l2n_stem / c2n_stem(ipft) &
-								 * (1. - C_resorption_factor(ipft))
-			   csite%slsc_in(ipa) = csite%slsc_in(ipa)	&
-			   					+ (1. - f_fast(ipft)) * delta_bleaf * f_labile(ipft) &
-								* (1. - C_resorption_factor(ipft)) *	cpatch%nplant(ico)
-			   csite%slsn_in(ipa) = csite%slsn_in(ipa)	&
-			   					+ (1. - f_fast(ipft)) * delta_bleaf * f_labile(ipft) / c2n_leaf(ipft) &
-								* (1. - N_resorption_factor(ipft)) *	cpatch%nplant(ico)
+               csite%fsc_in(ipa) = csite%fsc_in(ipa)                                    &
+                                 + cpatch%nplant(ico) * delta_bleaf                     &
+                                 * f_labile(ipft) * f_fast(ipft) 	                &
+				 * (1. - C_resorption_factor(ipft))
+               csite%fsn_in(ipa) = csite%fsn_in(ipa)                                    &
+                                 + cpatch%nplant(ico) * delta_bleaf                     &
+                                 * f_labile(ipft) * f_fast(ipft) / c2n_leaf(ipft)       &
+				 * (1. - N_resorption_factor(ipft))
+               csite%ssc_in(ipa) = csite%ssc_in(ipa)                                    &
+                                 + cpatch%nplant(ico) * delta_bleaf                     &
+                                 * (1.0-f_labile(ipft)) 				&
+                                 * (1. - C_resorption_factor(ipft))
+               csite%ssl_in(ipa) = csite%ssl_in(ipa)                                    &
+                                 + cpatch%nplant(ico) * delta_bleaf                     &
+                                 * (1.0 - f_labile(ipft)) * l2n_stem / c2n_stem(ipft)   &
+				 * (1. - C_resorption_factor(ipft))
+	       csite%slsc_in(ipa) = csite%slsc_in(ipa)                                                 &
+			   	+ (1. - f_fast(ipft)) * delta_bleaf * f_labile(ipft)                   &
+				* (1. - C_resorption_factor(ipft)) * cpatch%nplant(ico)
+               csite%slsn_in(ipa) = csite%slsn_in(ipa)	                                               &
+			   	+ (1. - f_fast(ipft)) * delta_bleaf * f_labile(ipft) / c2n_leaf(ipft)  &
+				* (1. - N_resorption_factor(ipft)) * cpatch%nplant(ico)
                !----- Adjust plant carbon pools. ------------------------------------------!
                cpatch%balive(ico)   = cpatch%balive(ico) - delta_bleaf
                cpatch%bstorage(ico) = cpatch%bstorage(ico) + C_resorption_factor(ipft)      &
                                     * delta_bleaf
-			   cpatch%nstorage(ico) = cpatch%nstorage(ico) + N_resorption_factor(ipft)		&
+               cpatch%nstorage(ico) = cpatch%nstorage(ico) + N_resorption_factor(ipft)		&
 			   						* delta_bleaf / c2n_leaf(ipft)
-			   ! check whether nstorage reaches maximum
-			   if (cpatch%nstorage(ico) > cpatch%nstorage_min(ico) *  nstorage_max_factor) then
-			   	csite%fsn_in(ipa) = csite%fsn_in(ipa) + (cpatch%nstorage(ico) - &
-						cpatch%nstorage_min(ico) * nstorage_max_factor) * f_fast(ipft) * cpatch%nplant(ico)
+               ! check whether nstorage reaches maximum
+               if (cpatch%nstorage(ico) > cpatch%nstorage_min(ico) *  nstorage_max_factor) then
+                  csite%fsn_in(ipa) = csite%fsn_in(ipa) + (cpatch%nstorage(ico) - &
+                       cpatch%nstorage_min(ico) * nstorage_max_factor) * f_fast(ipft) * cpatch%nplant(ico)
                
-			   	csite%slsn_in(ipa) = csite%slsn_in(ipa) + (cpatch%nstorage(ico) - &
-						cpatch%nstorage_min(ico) * nstorage_max_factor) * (1. - f_fast(ipft)) * cpatch%nplant(ico)
-				cpatch%nstorage(ico) = cpatch%nstorage_min(ico) * nstorage_max_factor
-			   endif
-                cpatch%bleaf(ico)     = cpatch%bleaf(ico) - delta_bleaf               
+                  csite%slsn_in(ipa) = csite%slsn_in(ipa) + (cpatch%nstorage(ico) - &
+                       cpatch%nstorage_min(ico) * nstorage_max_factor) * (1. - f_fast(ipft)) * cpatch%nplant(ico)
+                  cpatch%nstorage(ico) = cpatch%nstorage_min(ico) * nstorage_max_factor
+               endif
+
+               cpatch%bleaf(ico)     = cpatch%bleaf(ico) - delta_bleaf               
                cpatch%cb(13,ico)     = cpatch%cb(13,ico)     - cpatch%leaf_drop(ico)
                cpatch%cb_max(13,ico) = cpatch%cb_max(13,ico) - cpatch%leaf_drop(ico)
+
+               if(cpatch%bleaf(ico) < 1.0e-6)then
+                  cpatch%phenology_status(ico) = 2
+               endif
           endif
+		  if (ipa == 1 .and. ico == 1) then
+		  	print*,'lai',cpatch%lai(ico)
+			print*,'total_lai',sum(csite%lai)
+			print*,'bstorage',cpatch%bstorage(ico)
+			print*,'nstorage',cpatch%nstorage(ico)
+			print*,'bstorage_min',cpatch%bstorage_min(ico)
+			print*,'phenology_status',cpatch%phenology_status(ico)
+			print*,'green_leaf_factor',csite%green_leaf_factor(ipft,ipa)
+			print*,'elongf',cpatch%elongf(ico)
+			print*,'delta_bleaf',delta_bleaf
+			print*,'bleaf',cpatch%bleaf(ico),'bleaf_max',dbh2bl(cpatch%dbh(ico),ipft)
+		  endif
           
           if(leaf_out_cold(ipft))then
              cpatch%phenology_status(ico) = 1
-             cpatch%bleaf(ico) = (csite%green_leaf_factor(ipft,ipa) *  &
-                  cpatch%balive(ico) /   &
-                  (1.+qsw(ipft)*cpatch%hite(ico)+q(ipft)))
+             cpatch%bleaf(ico) = (csite%green_leaf_factor(ipft,ipa) * dbh2bl(cpatch%dbh(ico),ipft))  
+                 ! cpatch%balive(ico) /   &
+                 ! (1.+qsw(ipft)*cpatch%hite(ico)+q(ipft)))
           endif
           call area_indices(cpatch%nplant(ico),cpatch%bleaf(ico), &
                cpatch%bdead(ico), cpatch%balive(ico), cpatch%dbh(ico), &
                cpatch%hite(ico), cpatch%pft(ico), cpatch%sla(ico), &
                cpatch%lai(ico), cpatch%wpa(ico), cpatch%wai(ico), &
                cpatch%crown_area(ico), cpatch%bsapwood(ico))
-          cpatch%agb(ico) = ed_biomass(cpatch%bdead(ico), cpatch%balive(ico), &
+               cpatch%agb(ico) = ed_biomass(cpatch%bdead(ico), cpatch%balive(ico), &
                cpatch%bleaf(ico), cpatch%pft(ico), cpatch%hite(ico), &
                cpatch%bstorage(ico), cpatch%bsapwood(ico))
 
@@ -292,6 +313,7 @@ Contains
                cpatch%pft(ico), cpatch%leaf_hcap(ico), cpatch%wood_hcap(ico))
           call update_veg_energy_cweh(csite,ipa,ico,old_leaf_hcap, old_wood_hcap)
           call is_resolvable(csite,ipa,ico,csite%green_leaf_factor(:,ipa))
+ 
        enddo
     enddo
 
