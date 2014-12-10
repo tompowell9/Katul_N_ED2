@@ -258,7 +258,9 @@ subroutine update_phenology(doy, cpoly, isi, lat)
    real, dimension(nzg)                  :: theta
    real                                  :: daylight
    real                                  :: delta_bleaf
+   real                                  :: delta_broot
    real                                  :: bl_max
+   real									 :: br_max
    real                                  :: old_leaf_hcap
    real                                  :: old_wood_hcap
    real                                  :: salloci
@@ -601,58 +603,11 @@ subroutine update_phenology(doy, cpoly, isi, lat)
             bl_full = dbh2bl(cpatch%dbh(ico),ipft)   ! the potential bleaf at full canopy
 
 
-                ! Calculate the PSI first
-                ! 10-day average soil water potential within the rooting depth
-				! It is used to calculate 'virtual' leaf water potential when there are no leaves
-
-!				t_psi = 0.0
- !               weighted_rooting_depth = 0.0
-  !              dayn = 0
-   !             do iday = 0,9,1
-    !                if (csite%past_psi(cpatch%krdepth(ico),31 - iday,ipa) /= 0) then
-     !                   do sl = cpatch%krdepth(ico),nzg
-      !                      current_layer_depth = -slz(sl)
-      !                      if (sl +1 .le. nzg) then
-      !                          above_layer_depth = -slz(sl + 1)
-      !                      else
-      !                          above_layer_depth = 0.0
-      !                      endif
-! 
- !                           t_psi = t_psi + csite%past_psi(sl,31 - iday, ipa) * &
-  !                                  (root_beta(ipft) ** (above_layer_depth / -slz(cpatch%krdepth(ico))) - &
-   !                                 root_beta(ipft) ** (current_layer_depth / -slz(cpatch%krdepth(ico))) )
-    !                        weighted_rooting_depth = weighted_rooting_depth + current_layer_depth * &
-     !                               (root_beta(ipft) ** (above_layer_depth / -slz(cpatch%krdepth(ico))) - &
-      !                              root_beta(ipft) ** (current_layer_depth / -slz(cpatch%krdepth(ico))) )
-       !                         
-        
-        !                enddo
-         !            dayn = dayn + 1
-          !          endif
-           !     enddo
-
-            !    t_psi = t_psi / dayn
-
-				! update past_psi_leaf, should be put somewhere else later,
-				! maybe vegetation dynamics? XXT
-               
-                !Calculate 10-day average leaf water potential
-                !Although past_psi_open have 30 day memory
-                
-!                dayn = 0
- !               avg_psi_leaf = 0.0
-  !              do iday = 26,30
-   !                if (cpatch%past_psi_leaf(iday,ico) < 0.0) then
-    !                   avg_psi_leaf = avg_psi_leaf + cpatch%past_psi_leaf(iday,ico)
-     !                  dayn = dayn + 1
-      !             endif
-       !         enddo
-
                 dayn = 0
                 avg_psi_leaf = 0.0
 				low_psi_day = 0
 				high_psi_day = 0
-                do iday = 26,30
+                do iday = 21,30
                    if (cpatch%past_psi_leaf(iday,ico) < 0.0) then
                        avg_psi_leaf = avg_psi_leaf + cpatch%past_psi_leaf(iday,ico)
                        dayn = dayn + 1
@@ -675,7 +630,10 @@ subroutine update_phenology(doy, cpoly, isi, lat)
                 endif
 
             	! update m_coef 
-!                 cpatch%m_coef(ico) = max(1e-6,min(1.0,1 / (1 + (avg_psi_leaf / leaf_psi50(ipft)) ** 10.0)))
+!                 cpatch%m_coef(ico) = max(1e-6,min(1.0, &
+!							0.5 * 1. / (1. + (cpatch%predawn_psi_leaf(ico) / leaf_psi50(ipft)) ** 10.0) + &
+!							0.5 * 1. / (1. + (cpatch%midday_psi_leaf(ico) / leaf_psi50(ipft)) ** 10.0)    &
+!							))
 				! -------------------------------------------------------
 				! -----   XXT  Calculate leaf drop or leaf onset
 				! ------------------------------------------------------
@@ -689,19 +647,30 @@ subroutine update_phenology(doy, cpoly, isi, lat)
                 endif
 
                 if (cpatch%phenology_status(ico) /= 2) then
-                          	if (low_psi_day == 5)  then ! 10day average < turgor loss point
+                          	if (low_psi_day == 10)  then ! 10day average < turgor loss point
                                	new_elongf = max(0.0, last_elongf - 1./25.)
-                            elseif (high_psi_day == 5) then
-                                new_elongf = min(1.0, last_elongf + 1./45.)
+                            elseif (high_psi_day == 10) then
+                                new_elongf = min(1.0, last_elongf + 1./40.)
                             endif
+               !           	if (avg_psi_leaf <= TLP(ipft))  then ! 10day average < turgor loss point
+               !                	new_elongf = max(0.0, last_elongf - 1./20.)
+                !            elseif (avg_psi_leaf > 0.5 * TLP(ipft)) then
+                !                new_elongf = min(1.0, last_elongf + 1./40.)
+                !            endif
                 endif
                                 
                ! the case without leaves
                if ((cpatch%phenology_status(ico) == 2 ) &
-                    .and.high_psi_day == 5 .and. &
+                    .and.high_psi_day == 10 .and. &
 					   (.not. photo_dormant)) then  !without leaf
                         new_elongf = elongf_min + 0.01  !let the tree grow a small fraction of leaves
                endif
+!               if ((cpatch%phenology_status(ico) == 2 ) &
+!                    .and.avg_psi_leaf > 0.5 * TLP(ipft) .and. &
+!					   (.not. photo_dormant)) then  !without leaf
+ !                       new_elongf = elongf_min + 0.01  !let the tree grow a small fraction of leaves
+ !              endif
+
                             
    			cpatch%elongf(ico)  = new_elongf
 
@@ -712,17 +681,17 @@ subroutine update_phenology(doy, cpoly, isi, lat)
             if (photo_dormant) then  ! photoperiod control
                 cpatch%elongf(ico) = max(0.0,min(cpatch%elongf(ico),last_elongf - 1/150.))
             endif
-                                
             bl_max              = cpatch%elongf(ico)  * bl_full
+			br_max				= bl_full * q(ipft) * (cpatch%elongf(ico) + 1.0) 	/2.0
 
             delta_bleaf = cpatch%bleaf(ico) - bl_max
-
+			delta_broot = cpatch%broot(ico) - br_max
                         
             if(delta_bleaf < -1e-6) then
                       cpatch%phenology_status(ico) = 1
             else if (delta_bleaf > 1e-6) then
                       cpatch%phenology_status(ico) = -1 
-            else
+            else if (cpatch%elongf(ico) > 0.9 ) then ! ~ nearly full canopy
                       cpatch%phenology_status(ico) = 0
             end if
 
@@ -786,26 +755,89 @@ subroutine update_phenology(doy, cpoly, isi, lat)
                !----- Not in allometry but growing, allocate carbon in growth_balive. -----!
                         cpatch%phenology_status(ico) = 1
             end if
-			call cpu_time(cpu_t)
-                if(ipa == 1 .and. ico == 2) then
+
+			! deal with root
+            if (delta_broot > 0.0) then
+               csite%fsc_in(ipa) = csite%fsc_in(ipa)                                       &
+                                 + cpatch%nplant(ico) * delta_broot              &
+                                 * f_labile(ipft) * f_fast(ipft) 						 &
+								 * (1. - C_resorption_factor(ipft))
+               csite%fsn_in(ipa) = csite%fsn_in(ipa)                                       &
+                                 + cpatch%nplant(ico) * delta_broot              &
+                                 * f_labile(ipft) * f_fast(ipft) / c2n_leaf(ipft)  &
+								 * (1. - N_resorption_factor(ipft))
+               csite%ssc_in(ipa) = csite%ssc_in(ipa)                                       &
+                                 + cpatch%nplant(ico) * delta_broot              &
+                                 * (1.0-f_labile(ipft)) 						 &
+								 * (1. - C_resorption_factor(ipft))
+               csite%ssl_in(ipa) = csite%ssl_in(ipa)                                       &
+                                 + cpatch%nplant(ico) * delta_broot              &
+                                 * (1.0 - f_labile(ipft)) * l2n_stem / c2n_stem(ipft) &
+								 * (1. - C_resorption_factor(ipft))
+			   csite%slsc_in(ipa) = csite%slsc_in(ipa)	&
+			   					+ (1. - f_fast(ipft)) * delta_broot * f_labile(ipft) &
+								* (1. - C_resorption_factor(ipft)) *	cpatch%nplant(ico)
+			   csite%slsn_in(ipa) = csite%slsn_in(ipa)	&
+			   					+ (1. - f_fast(ipft)) * delta_broot * f_labile(ipft) / c2n_leaf(ipft) &
+								* (1. - N_resorption_factor(ipft)) *	cpatch%nplant(ico)
+               !----- Adjust plant carbon pools. ------------------------------------------!
+               cpatch%balive(ico)   = cpatch%balive(ico) - delta_broot
+               cpatch%bstorage(ico) = cpatch%bstorage(ico) + C_resorption_factor(ipft)      &
+                                    * delta_broot
+			   cpatch%nstorage(ico) = cpatch%nstorage(ico) + N_resorption_factor(ipft)		&
+			   						* delta_broot / c2n_leaf(ipft)
+			   ! check whether nstorage reaches maximum
+			   if (cpatch%nstorage(ico) > cpatch%nstorage_min(ico) *  nstorage_max_factor) then
+			   	csite%fsn_in(ipa) = csite%fsn_in(ipa) + (cpatch%nstorage(ico) - &
+						cpatch%nstorage_min(ico) * nstorage_max_factor) * f_fast(ipft) * cpatch%nplant(ico)
+               
+			   	csite%slsn_in(ipa) = csite%slsn_in(ipa) + (cpatch%nstorage(ico) - &
+						cpatch%nstorage_min(ico) * nstorage_max_factor) * (1. - f_fast(ipft)) * cpatch%nplant(ico)
+
+				cpatch%nstorage(ico) = cpatch%nstorage_min(ico) *	nstorage_max_factor
+			   endif
+
+                cpatch%broot(ico)     = cpatch%broot(ico) - delta_broot            
+                
+               cpatch%cb(13,ico)     = cpatch%cb(13,ico)     - delta_broot * (1 - C_resorption_factor(ipft))
+               cpatch%cb_max(13,ico)     = cpatch%cb_max(13,ico)     - delta_broot * (1 - C_resorption_factor(ipft))
+            end if
+
+
+!			call cpu_time(cpu_t)
+                if(ipa == 1 .and. ico == 1) then
              !           print*,'psi',t_psi
-						print*,'avg_leaf_psi',avg_psi_leaf
-	                    print*,'high_psi_day',high_psi_day
-	                    print*,'low_psi_day',low_psi_day
-                        print*,'lai',cpatch%lai(ico)
-             !          print*,'delta_bleaf',delta_bleaf
-						print*,'bleaf fullness',cpatch%bleaf(ico)/bl_full
-			!			print*,'daylight',daylight,'elongf',cpatch%elongf(ico)
+!						print*,'avg_leaf_psi',avg_psi_leaf
+!	                    print*,'high_psi_day',high_psi_day
+!	                    print*,'low_psi_day',low_psi_day
+                        print*,'lai 23+26',sum(pack(cpatch%lai,cpatch%pft == &
+									23)) + sum(pack(cpatch%lai,cpatch%pft == 26))
+                        print*,'lai 27',sum(pack(cpatch%lai,cpatch%pft == 27))
+                        print*,'lai 24',sum(pack(cpatch%lai,cpatch%pft == 24))
+                        print*,'lai 29',sum(pack(cpatch%lai,cpatch%pft == 29))
+!                       print*,'delta_bleaf',delta_bleaf
+!                       print*,'delta_broot',delta_bleaf
+                       print*,'bleaf',cpatch%bleaf(ico)
+                       print*,'elongf',cpatch%elongf(ico)
+!						print*,'bleaf fullness',cpatch%bleaf(ico)/bl_full
+!			!			print*,'daylight',daylight,'elongf',cpatch%elongf(ico)
                         print*,'dbh',cpatch%dbh(ico)
                         print*,'pft',cpatch%pft(ico)
                         print*,'pheno_status',cpatch%phenology_status(ico)
                         print*,'bstorage',cpatch%bstorage(ico)
-						print*,'nstorage',cpatch%nstorage(ico)
-						print*,'co_id',cpatch%cohort_id(ico)
-						print*,'time', cpu_t
+                        print*,'bstorage_min',cpatch%bstorage_min(ico)
+!						print*,'nstorage',cpatch%nstorage(ico)
+!						print*,'nstorage_min',cpatch%nstorage_min(ico)
+!						print*,'co_id',cpatch%cohort_id(ico)
+!						print*,'hite',cpatch%hite(ico)
+!						print*,'time', cpu_t
 						print*,'midday_psi',cpatch%midday_psi_leaf(ico)
-						print*,'soil_water',csite%soil_water(18:20,ipa)
+						print*,'predawn_psi',cpatch%predawn_psi_leaf(ico)
+			!			print*,'pasi_psi_leaf',cpatch%past_psi_leaf(26:30,ico)
+!						print*,'soil_water',csite%soil_water(8:10,ipa)
+!						print*,'fsn',cpatch%fsn(ico)
 			!			print*,'sla',cpatch%sla(ico)
+						print*,'total_lai',sum(csite%lai) / size(csite%lai)
                 end if
 
             
@@ -1013,8 +1045,8 @@ subroutine resorbed_N(ico,ipa,cpatch,csite,ipft,N_resorbed_phenology)
   ! Define maximum Nstorage and update N storage pool. Once Nstorage max   !
   ! is reached, put the rest of the resorbed N into fsn_in                 !         
   !------------------------------------------------------------------------! 
-  ! N_resorbed_phenology =  cpatch%leaf_drop(ico) * f_labile(ipft) /         &
-   !                                       c2n_leaf(ipft) * resorption_factor
+  N_resorbed_phenology =  cpatch%leaf_drop(ico) * f_labile(ipft) /         &
+                                          c2n_leaf(ipft) * resorption_factor
 
   !define maximum Nstorage 
   nstorage_max = dbh2bl(cpatch%dbh(ico),ipft)/c2n_leaf(ipft) * nstorage_max_factor

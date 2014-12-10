@@ -2,7 +2,7 @@ Module katul_stomatal
 
 Contains
 
-  subroutine katul_lphys(par, ca, Tleaf, gbw, ea, Vm0, lambda0,  &
+  subroutine katul_lphys(par, ca, Tleaf, gbw, ea, Vm0, lambda0, beta0,  &
         air_density, cuticular_cond, leaf_psi,leaf_psi50, &
        accepted_fc, accepted_gsw, A_cl, gsw_cl, leaf_resp, &
 	   m_coef,hite_coef,ipft,ico,former_gV,former_gJ)
@@ -34,6 +34,7 @@ Contains
     real, intent(in) :: cuticular_cond ! umol/m2/s
 
     real, intent(in) :: lambda0 ! umol/mol/kPa
+    real, intent(in) :: beta0 ! m-1
 	real, intent(in) :: leaf_psi
 	real, intent(in) :: leaf_psi50
 !    real, intent(in) :: growth_resp ! umol/m2/s
@@ -116,22 +117,21 @@ Contains
 		thighfun = 1 + exp(lnexphigh)
 		Vcmax20 = Vcmax20 / (tlowfun * thighfun)
 	elseif (temp_scheme == 3) then
-		call harley_temp_fun(Tleaf+273.15,288.15,&
+		! use 20 degC as reference temperature according to Leuning 1997
+		call harley_temp_fun(15.+273.15,293.15,&
 							116.3,  & ! Hv
 							0.65,   & ! Sv
 							202.9,  & ! Hd
 							t_coef)
-		Vcmax = Vm0 * t_coef
+		Vcmax20 = Vm0 / t_coef
+
+		call harley_temp_fun(Tleaf+273.15,293.15,&
+							116.3,  & ! Hv
+							0.65,   & ! Sv
+							202.9,  & ! Hd
+							t_coef)
+		Vcmax = Vcmax20 * t_coef
 !		if(ico == 1) print*,'Vm02Vcmax',t_coef
-
-		call harley_temp_fun(20.+273.15,288.15,&
-							116.3,  & ! Hv
-							0.65,   & ! Sv
-							202.9,  & ! Hd
-							t_coef)
-		Vcmax20 = Vm0 * t_coef
-!		if(ico == 1) print*,'Vm02Vcmax20',t_coef
-
 
 	endif
 
@@ -160,9 +160,9 @@ Contains
 !    endif
 
     ! Temperature dependence for respiration in the dark.
-	Rd0 = Vm0 * dark_respiration_factor(ipft)
+	Rd0 = Vcmax20 * dark_respiration_factor(ipft)
 
-	Rdark = Rd0 * exp(46.39/(8.314e-3*288.15) * (1 - 288.15/(Tleaf+273.15))) 
+	Rdark = Rd0 * exp(46.39/(8.314e-3*293.15) * (1 - 293.15/(Tleaf+273.15))) 
 !	Temp dependence from Harley et al. 1992
 
     ! Calculate actual leaf respiration depending on whether or not
@@ -170,15 +170,20 @@ Contains
 	Rleaf = Rdark
 
 !    if(par > rd_light_threshold)then
- !      Rleaf = Rdark * (1.0 - resp_inhib)
-  !  endif
+!       Rleaf = Rdark * (1.0 - resp_inhib)
+!    endif
 
 	! correcting for leaf water stress and canopy position
 	Vcmax = Vcmax * hite_coef * m_coef
 	Jmax = Jmax * hite_coef * m_coef
-	Rleaf = Rleaf * hite_coef
-	cuticular_gsc = cuticular_cond * m_coef * 1.0e-6
-	lambda = lambda0 * leaf_psi / leaf_psi50
+	Rleaf = Rleaf * hite_coef * m_coef
+	
+	cuticular_gsc = cuticular_cond * 1.0e-6 * &
+		max(0.0,min(1.0, (leaf_psi - (10. * -102.)) / ((10.-2.) * 102.)))
+	! when leaf water potential is too low, there can't be any water loss...
+	! mimicking the cease of soil evaporation near sh
+
+	lambda = lambda0 ! * ca / 400. * exp(beta0 * leaf_psi)
 
     ! Solve the quadratic
     Jrate = ((Jmax+0.385*par) -   &
@@ -191,7 +196,7 @@ Contains
 	endif
 
 	is_resolvable = (Jmax /= 0.) .and. (Vcmax /= 0.) .and. &
-			(raero < 1e8)
+			(raero < 1e8) .and.(cuticular_gsc > 1e-8)
 
 	if (is_resolvable) then
 	    ! Set up the calculation
@@ -257,8 +262,9 @@ Contains
 							(testg < cuticular_gsc .and. dfcdg-dfedg < 0.) .or.   &		! close stomatal
 							(testg < cuticular_gsc .and. isnan(dfcdg-dfedg)) .or.   &	! close stomatal
 							(testg + delta_g < 0.)					.or.			& 	! unrealistic values
+							(isnan(delta_g) < 0.)					.or.			& 	! unrealistic values
 							(delta_g == 0.)					.or.					& 	! trapped
-							(testg > 0.4 .and. dfcdg-dfedg > 0.)			  &			! fullyopen stomatal
+							(testg > 1.0 .and. dfcdg-dfedg > 0.)			  &			! fullyopen stomatal
 						) then
 							exit
 						endif
@@ -273,15 +279,15 @@ Contains
 !	if(ico == 2)print*,'V testg',testg,'dfcdg-dfedg',dfcdg-dfedg,'iter',iter
 !if(ico==45) print*,'V iter',iter,'V testg', testg
 			   ! check the case that a negative or no optimal value is found
-				   if (testg < cuticular_gsc) then ! .or. &!cuticular_cond * 1.0e-6 / 1.6 .or. &
+				   if (testg < cuticular_gsc .or. isnan(testg)) then ! .or. &!cuticular_cond * 1.0e-6 / 1.6 .or. &
 !					   (iter > 500 .and. dfcdg - dfedg < 0.) .or. &
 !					   isnan(testg)) then
 	   					testg = cuticular_gsc ! cuticular_cond * 1.0e-6 / 1.6
 		  	    	endif
 	   		
-				   if (testg > 0.4) then 
+				   if (testg > 1.0) then 
 				   		if (par > 50. .and. dfcdg-dfedg > 0.) then ! light
-					   		testg = 0.4
+					   		testg = 1.0
 			 			  else ! dark
 							testg = cuticular_gsc 
 					  	endif
@@ -366,8 +372,9 @@ Contains
 							(testg < cuticular_gsc .and. dfcdg-dfedg < 0.) .or.   &		! close stomatal
 							(testg < cuticular_gsc .and. isnan(dfcdg-dfedg)) .or.   &	! close stomatal
 							(testg + delta_g < 0.)					.or.			& 	! unrealistic values
+							(isnan(delta_g) < 0.)					.or.			& 	! unrealistic values
 							(delta_g == 0.)					.or.					& 	! trapped
-							(testg > 0.4 .and. dfcdg-dfedg > 0.)			  &			! fullyopen stomatal
+							(testg > 1.0 .and. dfcdg-dfedg > 0.)			  &			! fullyopen stomatal
 						) then
 							exit
 						endif
@@ -378,13 +385,13 @@ Contains
 				   enddo
 
 !	if(ico == 2)print*,'J testg',testg,'dfcdg-dfedg',dfcdg-dfedg,'iter',iter
-			   if (testg < cuticular_gsc ) then!.or. &!cuticular_cond * 1.0e-6 / 1.6 .or. &
+			   if (testg < cuticular_gsc .or. isnan(testg)) then!.or. &!cuticular_cond * 1.0e-6 / 1.6 .or. &
 		   			testg = cuticular_gsc ! cuticular_cond * 1.0e-6 / 1.6
 	  		    endif
 	   		
-		   		if (testg > 0.4) then 
+		   		if (testg > 1.0) then 
 		   			if (par > 50. .and. dfcdg-dfedg>0.) then ! light
-			   			testg = 0.4
+			   			testg = 1.0
 		 		  	else ! dark
 						testg = cuticular_gsc 
 			   		endif
@@ -423,10 +430,10 @@ Contains
 	accepted_gsw = accepted_g * 1.6 * mmdry
 	gsw_cl = cuticular_gsc * 1.6 * mmdry!cuticular_cond * 1.0e-6 * mmdry
 
-!	if(ico == 2)print*,'par',par,'Anet',accepted_fc,'Vcmax',Vcmax,'Jrate',Jrate*4,'m_coef',m_coef,&
-!					'Vm0',Vm0,'Rleaf',Rleaf,'VPD',ei-ea,'gsc',accepted_g,'leaf_temp',Tleaf,&
-!					'myg_V',myg_V,'myg_J',myg_J,'myfc_V',myfc_V,'myfc_J',myfc_J,'raero',raero,'testci',testci,'lambda',lambda,&
-!					'leaf_psi',leaf_psi
+	if( isnan(accepted_fc))print*,'par',par,'Anet',accepted_fc,'Vcmax',Vcmax,'Jrate',Jrate*4,'m_coef',m_coef,&
+					'Vm0',Vm0,'Rleaf',Rleaf,'VPD',ei-ea,'gsc',accepted_g,'leaf_temp',Tleaf,&
+					'myg_V',myg_V,'myg_J',myg_J,'myfc_V',myfc_V,'myfc_J',myfc_J,'raero',raero,'testci',testci,&
+					'lambda',lambda, lambda0,'lambda0','beta0',beta0,'leaf_psi',leaf_psi
   end subroutine katul_lphys
 
 !==========================================================

@@ -197,7 +197,7 @@ subroutine structural_growth(cgrid, month)
 				! update bdead, bstorage and nstorage
 !if(ico == 2) &
 !print*,'actual_available_bstorage',actual_available_bstorage,'bstorage_min',cpatch%bstorage_min(ico),'nstorage_min',cpatch%nstorage_min(ico),&
-!	'f_bdead',f_bdead
+!	'f_bdead',f_bdead,'deadwood_ratio',deadwood_ratio
                !----- Grow plants; bdead gets fraction f_bdead of bstorage. ---------------!
                cpatch%bdead(ico) = cpatch%bdead(ico) + f_bdead * actual_available_bstorage * deadwood_ratio
 			   if(isnan(cpatch%bdead(ico))) then
@@ -230,6 +230,7 @@ subroutine structural_growth(cgrid, month)
                cpatch%nstorage(ico) = cpatch%nstorage(ico)  -	 & 
 					actual_available_bstorage * (f_bdead * deadwood_ratio / c2n_stem(ipft) + f_bseeds / c2n_recruit(ipft))
 
+!if(ico == 2)print*, 'bstorage after struct',cpatch%bstorage(ico)
                n2=n2+csite%area(ipa)*cpatch%nplant(ico)                                    &
                  * (cpatch%balive(ico)/c2n_leaf(cpatch%pft(ico))                           &
                   +cpatch%bdead(ico)/c2n_stem(cpatch%pft(ico))+cpatch%nstorage(ico)        &
@@ -582,7 +583,7 @@ subroutine plant_structural_allocation(ipft,hite,lat,month,phen_status,f_bseeds,
    ! thing to reproduction or growth if it is not the right time of year (for cold         !
    ! deciduous plants), or if the plants are actively dropping leaves or off allometry.    !
    !---------------------------------------------------------------------------------------!
-   if ((phenology(ipft) /= 2   .or.  late_spring) .and. (phen_status == 0 .or. phen_status == 1))then!ATT
+   if ((phenology(ipft) /= 2   .or.  late_spring) .and. (phen_status == 0))then!ATT
       if (is_grass(ipft) .and. hite >= hgt_max(ipft)) then
          !---------------------------------------------------------------------------------!
          !    Grasses have reached the maximum height, stop growing in size and send       !

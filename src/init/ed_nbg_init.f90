@@ -63,7 +63,7 @@ subroutine near_bare_ground_init(cgrid)
 
 ! Delta Junction initialized with TB measurements
             csite%fast_soil_C        (1) = 0.0
-            csite%slow_soil_C        (1) = 5.017
+            csite%slow_soil_C        (1) = 0.0 !5.017
             csite%structural_soil_C  (1) = 0.2
             csite%structural_soil_L  (1) = csite%structural_soil_C (1)
             csite%mineralized_soil_N (1) = 0.001725

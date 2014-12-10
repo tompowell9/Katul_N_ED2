@@ -142,8 +142,8 @@ subroutine sw_twostream_clump(salbedo_par,salbedo_nir,scosz,scosaoi,ncoh,pft    
 
    !----- Calculate factors common for NIR, PAR. ------------------------------------------!
    ncoh2      = 2*ncoh
-!   lambda     = 5.d-1/cosaoi
-   lambda     = 1.0  ! Horizontal leaves
+   lambda     = 5.d-1/cosaoi  ! Random leaves
+!   lambda     = 1.0  ! Horizontal leaves
    lambda_tot = 0.0d0
    do il=1,ncoh
       ipft                       = pft(il)

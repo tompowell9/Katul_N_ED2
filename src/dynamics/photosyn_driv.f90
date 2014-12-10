@@ -14,6 +14,7 @@ subroutine canopy_photosynthesis(csite,cmet,mzg,ipa,lsl,ntext_soil              
 							 , Vm0				 &
 							 , stomatal_slope    &	 
 							 , leaf_psi50		 &
+							 , lambda0,beta0	 &
 							 , cuticular_cond! ! intent(in)
    use soil_coms      , only : soil              & ! intent(in)
                              , slz               & ! intent(in)
@@ -221,7 +222,8 @@ subroutine canopy_photosynthesis(csite,cmet,mzg,ipa,lsl,ntext_soil              
 								 cpatch%leaf_gbw(tuco), &!mmdry / cpatch%leaf_gbw(tuco) * 1.4, & ! aerodynamic resistance for CO2 s m2 / mol
 								 csite%can_shv(ipa) *csite%can_prss(ipa) * 0.001, & !canopy vapor pressure in kPa
 								 Vm0(ipft) * leaf_aging_factor(ipft), &
-								 stomatal_slope(ipft), &!
+								 lambda0(ipft) * exp(beta0(ipft) * cpatch%past_psi_leaf(30,tuco)), &!
+								 beta0(ipft), &!
 								 csite%can_rhos(ipa),&
 								 cuticular_cond(ipft),&
 								 cpatch%psi_leaf(tuco),&
@@ -324,7 +326,8 @@ subroutine canopy_photosynthesis(csite,cmet,mzg,ipa,lsl,ntext_soil              
 								 cpatch%leaf_gbw(ico), &!mmdry / cpatch%leaf_gbw(ico) * 1.4, & ! aerodynamic resistance for CO2 s m2 / mol
 								 csite%can_shv(ipa) *csite%can_prss(ipa) * 0.001, & !canopy vapor pressure in kPa
 								 Vm0(ipft) * leaf_aging_factor(ipft), & ! consider nitrogen limitation
-								 stomatal_slope(ipft), &!
+								 lambda0(ipft) * exp(beta0(ipft) * cpatch%past_psi_leaf(30,ico)), &!
+								 beta0(ipft), &!
 								 csite%can_rhos(ipa),&
 								 cuticular_cond(ipft),&
 								 cpatch%psi_leaf(ico),&

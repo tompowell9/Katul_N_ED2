@@ -1274,6 +1274,7 @@ subroutine init_pft_photo_params()
 							 , SLA,rho,TLP			   &
 							 , leaf_psi50,psi50		   &
 							 , Cap_stem,Cap_leaf	   &
+							 , lambda0,beta0		   &
 							 , SRA	! ! intent(out)
    use consts_coms    , only : t00                     & ! intent(in)
                              , twothirds               & ! intent(in)
@@ -1425,7 +1426,7 @@ subroutine init_pft_photo_params()
    dark_respiration_factor(18:20) = 0.02 !0.02 !0.015 ! 0.020 * gamfact
    dark_respiration_factor(21)    = 0.020
    dark_respiration_factor(22)    = 0.040
-   dark_respiration_factor(23:35) = 0.035
+   dark_respiration_factor(23:35) = 0.02
 
    !---------------------------------------------------------------------------------------!
 
@@ -1482,6 +1483,12 @@ subroutine init_pft_photo_params()
    stomatal_slope(21:29)     =  6.3849
    stomatal_slope(23:35)     =  15. ! 9.0 ! 8.0    * mfact
  
+   ! Mazoni et al. 2011
+   lambda0(1:35)     		 =  12.
+
+   beta0(1:35)				 =  -0.13 / 102.
+   
+
    cuticular_cond(1)         =  8000.0
    cuticular_cond(2)         = 10000.0
    cuticular_cond(3)         = 10000.0
@@ -1538,10 +1545,15 @@ subroutine init_pft_photo_params()
         psi50(ipft)  =  exp(-1.48 * rho(ipft) + 5.91) - 4. * 102. !min(-100.,max(-400.,-500. * (rho(ipft) - 0.35) - 100.)) 
         water_conductance(ipft) = exp(-1.55 * rho(ipft) + 1.71) !max(1.0,min(3.5,-3.8 * rho(ipft) + 4.6)) ! kg H2O /m /s/Mpa
         TLP(ipft)  = 102. * (-4.65 + 0.695 * log(SLA(ipft)) - 1.08 * log(rho(ipft)))
-	    
 		leaf_psi50(ipft) = (TLP(ipft) / 102. * 0.7 - 0.4) * 102.  ! from Brodribb et al. 2002
-		Vm0(ipft) = (-10. * (rho(ipft) - 0.3) + 12) * 0.50  ! According to Anet in Santiago et al. 2004 and Pineda-Garcia et al. 2011
+		Vm0(ipft) = (-10. * min(0.4,max(0.0,(rho(ipft) - 0.4))) + 14) * 1.0  ! According to Anet in Santiago et al. 2004 and Pineda-Garcia et al. 2011
    enddo
+   Vm0(23) = 9.0 * 0.8
+   Vm0(24) = 8.5 * 0.8
+   Vm0(26) = 9.0 * 0.8
+   Vm0(27) = 9.0 * 0.8
+   Vm0(29) = 12.0 * 0.8
+
  Vm0(6) = 11.35 
  psi50(6)= -2.6*102 !Aspinwall 2011 table 3
  water_conductance(6)= 0.92 !Aspinwall 2011 (may need to modify) 
@@ -1623,8 +1635,8 @@ subroutine init_decomp_params()
    r_stsc                    = 1.0!0.5!0.3
    r_ssc                     = 1.0
    K1                        = 4.5   / yr_day
-   K2                        = 11.0  / yr_day !ATT from Euskirchen et al 2009
-   K3                        = 100.2 / yr_day!ATT from Euskirchen et al 2009
+   K2                        = 11.0  / yr_day 
+   K3                        = 100.2 / yr_day
 
    return
 
@@ -1672,7 +1684,7 @@ subroutine init_pft_resp_params()
    growth_resp_factor(18:20)      = onethird
    growth_resp_factor(21)         = onethird
    growth_resp_factor(22)         = 0.4503
-   growth_resp_factor(23:35)      = 0.45
+   growth_resp_factor(23:35)      = 0.65
 
    leaf_turnover_rate(1)          = 2.0
    leaf_turnover_rate(2)          = 1.0
@@ -1696,7 +1708,7 @@ subroutine init_pft_resp_params()
    leaf_turnover_rate(20)          = onethird
    leaf_turnover_rate(21)         = 0.0
    leaf_turnover_rate(22)         = 0.143
-   leaf_turnover_rate(23:35)      = 0.5
+   leaf_turnover_rate(23:35)      = 0.75
 
    !----- Root turnover rate.  ------------------------------------------------------------!
    root_turnover_rate(1)          = 2.0
@@ -1721,7 +1733,7 @@ subroutine init_pft_resp_params()
    root_turnover_rate(20)         = onethird
    root_turnover_rate(21)         = 0.65!pinno2010
    root_turnover_rate(22)         = 1.56!ruess2003
-   root_turnover_rate(23:35)      = 1.
+   root_turnover_rate(23:35)      = 1.0
 
    storage_turnover_rate(1)       = 0.00 ! 0.25
    storage_turnover_rate(2)       = 0.00 ! 0.25
@@ -1743,7 +1755,7 @@ subroutine init_pft_resp_params()
    storage_turnover_rate(18:20)   = 0.00 ! 0.25
    storage_turnover_rate(21)      = 0.0 !0.6! 0.6243
    storage_turnover_rate(22)      = 0.00
-   storage_turnover_rate(23:35)   = 0.00
+   storage_turnover_rate(23:35)   = 0.0
 
    root_respiration_factor(1:35)  = 0.528 
 
@@ -1888,7 +1900,7 @@ subroutine init_pft_mort_params()
    mort3(20)  = 0.0
    mort3(21)  = 0.059!0.0067!0.059 
    mort3(22)  = 0.014! 0.005!0.014
-   mort3(23:35) = 0. !  0.15 * (1. - rho(30)) *1.1  !JL
+   mort3(23:35) =  0.0 !(-5 * (rho(23:35) - 0.25) + 3.75) / 100.
 
 
 
@@ -1981,7 +1993,7 @@ subroutine init_pft_mort_params()
    seedling_mortality(18:20)  = 0.95
    seedling_mortality(21)   = 0.95
    seedling_mortality(22)   = 0.95
-   seedling_mortality(23:35) = 0.95
+   seedling_mortality(23:35) = 1.00 !0.95
 
    !seedling_mortality=0.critical height survivorship
    treefall_s_gtht(1:35)    = 0.0
@@ -2189,12 +2201,12 @@ subroutine init_pft_alloc_params()
    rho(20)    = 0.87   ! 0.87
    rho(21:22) = 0.40
    rho(23:35) = 0.60
-   rho(23)     = 0.74 !0.74 ! one hardwood PFT !0.74
+   rho(23)     = 0.72 !0.74 ! one hardwood PFT !0.74
    rho(24)     = 0.85
-   rho(25)     = 0.61!0.10 + rho_m!0.78!0.73!0.70
-   rho(26)     = 0.61!0.71!0.61!0.41!0.50
+   rho(25)     = 0.72!0.10 + rho_m!0.78!0.73!0.70
+   rho(26)     = 0.72!0.71!0.61!0.41!0.50
    rho(27)     = 0.73! one hardwood PFT 0.74!0.42!0.43!0.53!0.50
-   rho(28)     = 0.74!0.73!0.68!0.77!0.85!0.70
+   rho(28)     = 0.73!0.73!0.68!0.77!0.85!0.70
    rho(29)     = 0.38
    rho(30)     = 0.38
    !---------------------------------------------------------------------------------------!
@@ -2220,12 +2232,12 @@ subroutine init_pft_alloc_params()
    SLA(21)    = 34.84!60.0!34.84
    SLA(22)    = 9.96!4.87*2.0/(3.14159/4.0)!divide by pi/4 to get cylindrical surface
    SLA(23:35) = 19.66
-   SLA(23)    = 17.6 !22.1! one hardwood PFT!
+   SLA(23)    = 16.8!22.1 !17.6 !22.1! one hardwood PFT!
    SLA(24)    = 16.4
-   SLA(25)    = 12.7!10.0 + SLA_m!16.8!20.0!19.7
-   SLA(26)    = 12.7 !20.0!16.6!12.9!20.0!17.6
-   SLA(27)    = 25.8 ! one hardwood PFT 22.1 !15.4!15.3!20.0!22.0
-   SLA(28)    = 22.1 !25.0!25.3!23.9!20.0!16.3
+   SLA(25)    = 16.8!12.7!10.0 + SLA_m!16.8!20.0!19.7
+   SLA(26)    = 16.8!12.7 !20.0!16.6!12.9!20.0!17.6
+   SLA(27)    = 25.8!25.8 ! one hardwood PFT 22.1 !15.4!15.3!20.0!22.0
+   SLA(28)    = 25.8 !25.0!25.3!23.9!20.0!16.3
    SLA(29)    = 19.8
    SLA(30)    = 19.8
    
@@ -2233,13 +2245,10 @@ subroutine init_pft_alloc_params()
    
    root_dens(1:35) = rho(1:35) * 1000. / 2.   ! convert it to kgC m3
 
-   Cap_stem(1:35) = min(400.,max(50.,-700. * (rho(1:35) - 0.3) + 400)) / 102. &
-   					/ 1.5 ! kgH2O/m3/m
-   ! 1.5 is correcting factor because we assume all the sapwood is at the base
-   ! of the trunk
+   Cap_stem(1:35) = min(400.,max(50.,-700. * (rho(1:35) - 0.3) + 400)) / 102.
    Cap_leaf(1:35) = 3.0e-3 / 102.         ! kgH2O/m2/m
  
-   Cap_leaf(6)= 600*18*1e-6/102 !Domec 2009 
+   Cap_leaf(6)= 600*18*1e-6/102 !Domec 2009 for loblloly pine
    !---------------------------------------------------------------------------------------!
    !    Fraction of vertical branches.  Values are from Poorter et al. (2006):             !
    !                                                                                       !
@@ -2289,7 +2298,7 @@ subroutine init_pft_alloc_params()
    q(18:20) = 1.0
    q(21)    = 1.8889!3.0
    q(22)    = 0.6078!1.104
-   q(23:35) = 0.89
+   q(23:35) = 0.6
 
    sapwood_ratio(1:35) = 3900.0
 
@@ -2328,7 +2337,7 @@ subroutine init_pft_alloc_params()
    init_density(18:20) = 0.1
    init_density(21)    = 0.1
    init_density(22)    = 0.1!0.1
-   init_density(23:35) = 0.016
+   init_density(23:35) = 0.5
    !---------------------------------------------------------------------------------------!
 
 
@@ -2411,11 +2420,11 @@ subroutine init_pft_alloc_params()
    b1Ht(21)    = 22.4914!Yarie+BL !21.085 Bond Lamberty!20.0 Yarie
    b1Ht(22)    = 18.0!fixed!23.259 Bond Lamberty!10.1 Yarie
    b1Ht(23:35) =  0.37 * log(10.0)
-   b1Ht(23)    = 0.6430 !0.6000 !0.6430    ! SLA 15 rho 8
+   b1Ht(23)    = 0.8303 !0.6430    ! SLA 15 rho 8
    b1Ht(24)    = 0.3263    ! SLA 15 rho 8 
-   b1Ht(25)    = 1.41    ! SLA 12 rho 6
-   b1Ht(26)     = 1.41 ! SLA 12 rho 6
-   b1Ht(27)     = 0.53 !0.6000 !0.53  ! softwood E
+   b1Ht(25)    = 0.8303    ! SLA 12 rho 6
+   b1Ht(26)     = 0.8303 ! SLA 12 rho 6
+   b1Ht(27)     = 0.5343 !0.53  ! softwood E
    b1Ht(28)     = 0.53 ! hardwood D
    b1Ht(29) = 0.38  ! not used now
    b1Ht(30) = 0.38  ! not used now
@@ -2437,11 +2446,11 @@ subroutine init_pft_alloc_params()
    b2Ht(21)    = -0.0776!Yarie+BL fit!-0.0761!Bond-Lamberty!-0.1063 Yarie
    b2Ht(22)    = -0.0631!Yarie+BL fit!-0.0519!Bond Lamberty!-0.0634 Yarie
    b2Ht(23:35) = 0.64
-   b2Ht(23)    =  0.5736 !0.5862 !0.5736   ! hardwood D
+   b2Ht(23)    =  0.5145 !0.5736   ! hardwood D
    b2Ht(24)    =  0.6462  ! hardwood D
-   b2Ht(25)    =  0.3563   ! hardwood D
-   b2Ht(26)     = 0.3553  ! softwood D
-   b2Ht(27)     = 0.6044 !0.5862 !0.6044    ! softwood E
+   b2Ht(25)    =  0.5145   ! hardwood D
+   b2Ht(26)     = 0.5145  ! softwood D
+   b2Ht(27)     = 0.6044 !0.6044    ! softwood E
    b2Ht(28)     = 0.6044  ! hardwood D
    b2Ht(29)     = 0.6892 !not used now
    b2Ht(30)     = 0.6892 !not used now
@@ -2534,17 +2543,17 @@ subroutine init_pft_alloc_params()
    end do
    !---------------------------------------------------------------------------------------!
 
-   b1Bl(23)  = 0.0140 * 2 !0.0111 * 2
-   b1Bl(24)  = 0.0220 * 2 !0.0119 * 2
-   b1Bl(26)  = 0.0082 * 2!0.0154 * 2
-   b1Bl(27)  = 0.0106 * 2!0.0076 * 2
-   b1Bl(29)  = 0.0113 * 2!0.0099 * 2
+   b1Bl(23)  = 0.0105 * 2!0.0123 * 2 !0.0111 * 2
+   b1Bl(24)  = 0.0170 * 2!0.0190 * 2 !0.0119 * 2
+   b1Bl(26)  = 0.0105 * 2!0.0075 * 2!0.0154 * 2
+   b1Bl(27)  = 0.0092 * 2!0.0093 * 2!0.0076 * 2
+   b1Bl(29)  = 0.0129 * 2!0.0117 * 2!0.0099 * 2
 
-   b2Bl(23)  =  1.964
-   b2Bl(24)  =  1.892
-   b2Bl(26)  =  2.183
-   b2Bl(27)	 =  1.934
-   b2Bl(29)  =  1.849
+   b2Bl(23)  =  2.0235!1.997
+   b2Bl(24)  =  1.8920!1.925
+   b2Bl(26)  =  2.0235!2.216
+   b2Bl(27)	 =  1.9340!1.967
+   b2Bl(29)  =  1.8490!1.882
 
 
    !---------------------------------------------------------------------------------------!
@@ -2631,19 +2640,19 @@ subroutine init_pft_alloc_params()
    !---------------------------------------------------------------------------------------!
 
 	b2Bs_small(24)   = 2.32
-	b1Bs_small(24)   = exp(-2.83) / agf_bs
+	b1Bs_small(24)   = exp(-2.82) / agf_bs
 
-	b2Bs_small(26)   = 2.30
-	b1Bs_small(26)   = exp(-3.17) / agf_bs
+	b2Bs_small(26)   = 2.31
+	b1Bs_small(26)   = exp(-2.96) / agf_bs
 
 	b2Bs_small(23)   = 2.31
 	b1Bs_small(23)   = exp(-2.95) / agf_bs
 
-	b2Bs_small(27)   = 2.30
-	b1Bs_small(27)   = exp(-2.89) / agf_bs
+	b2Bs_small(27)   = 2.29 !2.30
+	b1Bs_small(27)   = exp(-2.88) / agf_bs !exp(-2.89) / agf_bs
 
-	b2Bs_small(29)   = 2.35
-	b1Bs_small(29)   = exp(-3.88) / agf_bs
+	b2Bs_small(29)   = 2.36
+	b1Bs_small(29)   = exp(-3.94) / agf_bs
 
    b1Bs_big(:) = b1Bs_small(:)
    b2Bs_big(:) = b2Bs_small(:)
@@ -2651,20 +2660,20 @@ subroutine init_pft_alloc_params()
    b1Bsap(1:30) = exp(-2.70) / agf_bs
    b2Bsap(1:30) = 2.02
 
-   b1Bsap(24)   = exp(-1.89) / agf_bs
+   b1Bsap(24)   = exp(-1.87) / agf_bs
    b2Bsap(24)   = 2.32
 
-   b1Bsap(23)   = exp(-2.00) / agf_bs
+   b1Bsap(23)   = exp(-2.01) / agf_bs
    b2Bsap(23)   = 2.31
 
-   b1Bsap(26)   = exp(-2.23) / agf_bs
-   b2Bsap(26)   = 2.30
+   b1Bsap(26)   = exp(-2.01) / agf_bs
+   b2Bsap(26)   = 2.31
 
-   b1Bsap(27)   = exp(-1.95) / agf_bs
-   b2Bsap(27)   = 2.30
+   b1Bsap(27)   = exp(-1.94) / agf_bs!exp(-1.95) / agf_bs
+   b2Bsap(27)   = 2.30 !2.30
 
-   b1Bsap(29)   = exp(-2.94) / agf_bs
-   b2Bsap(29)   = 2.35
+   b1Bsap(29)   = exp(-2.99) / agf_bs
+   b2Bsap(29)   = 2.36
 
    b1Bsap(6) = 0.0792/0.8*0.1 
    b2Bsap(6)= 2.4349
@@ -2741,16 +2750,16 @@ subroutine init_pft_alloc_params()
       b2Rd(1:35)  =  0.4223014
    end select
    !---------------------------------------------------------------------------------------!
-
-   b1Rd(23) = -0.2185333 * 0.5 * 2.5 !2.0 
-   b1Rd(24) = -0.2185333 * 0.5 * 2.5 !4.0 
-   b1Rd(25) = -0.2185333 * 0.5 * 2.5 !3.0 
-   b1Rd(26) = -0.2185333 * 0.5 * 2.5 !2.5 
-   b1Rd(27) = -0.2185333 * 0.5 * 2.5 !1.5 
-   b1Rd(28) = -0.2185333 * 0.5 * 2.5 !3.0 
-   b1Rd(29) = -0.2185333 * 0.5 * 2.5 !1.0 
-   b1Rd(30) = -0.2185333 * 0.5 * 2.5 !3.0 
    b2Rd(23:30) =  0.5436442
+   b1Rd(23:30) = -0.2185333 * 0.5 * 1.5
+   b1Rd(23) = -0.2185333 * 0.5 * 1.2 !rd_m !2.0 
+   b1Rd(24) = -0.2185333 * 0.5 * 1.6 !rd_m !4.0 
+   b1Rd(25) = -0.2185333 * 0.5 * 1.2 !rd_m !3.0 
+   b1Rd(26) = -0.2185333 * 0.5 * 1.2 !rd_m !2.5 
+   b1Rd(27) = -0.2185333 * 0.5 * 1.0 !rd_m !1.5 
+   b1Rd(28) = -0.2185333 * 0.5 * 1.0 !rd_m !3.0 
+   b1Rd(29) = -0.2185333 * 0.5 * 0.8 !rd_m !1.0 
+   b1Rd(30) = -0.2185333 * 0.5 * 0.6 !rd_m !3.0 
    if (write_allom) then
       open (unit=18,file=trim(allom_file),status='replace',action='write')
       write(unit=18,fmt='(209a)') ('-',n=1,209)
@@ -2904,10 +2913,15 @@ c2n_leaf(16:17)  = 1000.0 / ((0.11289 + 0.12947 * Vm0(16:17)) * SLA(16:17))
 c2n_leaf(18:20)  = 1000.0 / ((0.11289 + 0.12947 *   Vm0(18:20)) * SLA(18:20))
 c2n_leaf(21)     = 16.0!20.0
 c2n_leaf(22)     = 63.0
-c2n_leaf(23:35)    = 1000.0 / ((0.11289 + 0.12947 *   Vm0(23:35)) * SLA(23:35)  ) / 3. ! From Jennifer Powers Data
-
-root_beta(1:35)   = 0.96 ** (150)   ! Jackson et al. 1995
-
+!c2n_leaf(23:35)    = 1000.0 / ((0.11289 + 0.12947 *   Vm0(23:35)) * SLA(23:35)  ) / 2. ! From Jennifer Powers Data
+c2n_leaf(23:35) = exp(-0.4972 * log(SLA(23:35)) + 4.5071) ! Powers and Tiffin 2010
+print*,'c2n_leaf',c2n_leaf(23:29)
+root_beta(1:35)   = 0.95 ** (200)   ! Jackson et al. 1995
+!root_beta(24)   = 0.96 ** (200)   
+!root_beta(23)   = 0.95 ** (200)   
+!root_beta(26)   = 0.95 ** (200)   
+!root_beta(27)   = 0.94 ** (200)   
+!root_beta(29)   = 0.94 ** (200)   
 C_resorption_factor(1:35) = 0.25
 N_resorption_factor(1:35) = 0.48
 
@@ -3095,7 +3109,7 @@ subroutine init_pft_repro_params()
    r_fract(18:20)          = 0.3
    r_fract(21)             = 0.3
    r_fract(22)             = 0.3
-   r_fract(23:35)          = 0.2
+   r_fract(23:35)          = 0.3
 
    st_fract(1)             = 0.0
    st_fract(2:4)           = 0.0

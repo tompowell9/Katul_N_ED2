@@ -842,6 +842,7 @@ module rk4_driver
 								 , soil8				&
 								 , slz					&
 								 , dslz					&
+								 , nlsl					&
 								 , soil! ! intent(in)
       use consts_coms     , only : wdns8				&
 								 , wdnsi8				&
@@ -849,6 +850,7 @@ module rk4_driver
 								 , tsupercool8			&
 								 , cliq8				&
 								 , cice8				&
+								 , wdns					&
 								 , pi1					
       use rk4_coms        , only : rk4patchtype        
 	  use therm_lib8	 , only	 : qwtk8,qtk8
@@ -861,6 +863,7 @@ module rk4_driver
 								 , root_dens			&
 								 , root_beta			&
 								 , cuticular_cond
+	  use nutrient_constants     , only : nstorage_max_factor
       implicit none
       !----- Arguments --------------------------------------------------------------------!
       type(sitetype)        , target      :: csite
@@ -906,6 +909,9 @@ module rk4_driver
 	  real(kind=8)						   :: rl_energy
 	  real(kind=8)						   :: transp_energy ! the internal energy taken away by transpiration
 
+	  real						   :: N_con ! soil water N concentration (kgN/kgH2O)
+	  real						   :: N_uptake ! actual nitrogen uptake (kgN)
+
 	  cpatch => csite%patch(ipa)
 	  ! Calculate layer_psi
    	  do k = 1,nzg
@@ -934,7 +940,8 @@ cohortloop:do ico = 1,cpatch%ncohorts
 !				max(0.01,min(1.0,1 / (1 + (cpatch%psi_leaf(ico) / leaf_psi50(ipft)) ** 10.0)))
 			
 			stem_cond =  water_conductance(ipft) / 102.   & !convert to kg H2O m-1 s-1 m-1
-						 * (1 / (1 + ((cpatch%psi_leaf(ico)+cpatch%psi_stem(ico))/2.0 / psi50(ipft)) ** 6.0)) &  ! stem cavitation
+						 * ( 1 / (1 + (cpatch%psi_leaf(ico)/ psi50(ipft)) ** 6.0) + &  ! stem cavitation
+							+1 / (1 + (cpatch%psi_stem(ico)/ psi50(ipft)) ** 6.0) ) / 2.0 &
 						 * (pi1 * (cpatch%dbh(ico) / 200.) ** 2 &
 						 * (cpatch%bsapwood(ico) / (cpatch%bsapwood(ico) + cpatch%bdead(ico)))) & ! sapwood area m2
 						 / (cpatch%hite(ico) * vessel_length_coef)														 !height of the tree   m
@@ -995,21 +1002,22 @@ cohortloop:do ico = 1,cpatch%ncohorts
 					SRA(ipft) / &  !	m2/kgC
 					(2.0 * cpatch%crown_area(ico) / cpatch%nplant(ico))     ! m2
 			! The unit of RAI is m2/m2
-
 			!  Calculate soil water conductance
      		nsoil = csite%ntext_soil(k,ipa)
 			wgpfrac = min(1.0,initp%soil_water(k) * initp%soil_fracliq(k) / soil(nsoil)%slmsts)
-			! disable hydraulic redistribution
-!			if (layer_psi(k) <= cpatch%psi_stem(ico)) then
-!				soil_water_cond = 0.0
-!			else
+			
 			if (cpatch%crown_area(ico) < 1e-6 .or. cpatch%nplant(ico) < 1e-6) then
 				soil_water_cond = 0
 			else
 				soil_water_cond = soil(nsoil)%slcons * wgpfrac ** (2.0 * soil(nsoil)%slbs + 3.0) * 1.e3 &	! kgH2O m-2 s-1
 								  * sqrt(RAI) / (pi1 * dslz(k))  &  ! m-1
-								  * cpatch%crown_area(ico) / cpatch%nplant(ico)	! m2 
+								  * 2.0 * cpatch%crown_area(ico) / cpatch%nplant(ico)	! m2 
 			endif
+
+
+			! disable hydraulic redistribution
+!			if (layer_psi(k) <= cpatch%psi_stem(ico)) then
+!				soil_water_cond = 0.0
 !			endif
 			! The unit of soil_water_cond is kgH2O m-1 s-1
 
@@ -1062,7 +1070,9 @@ cohortloop:do ico = 1,cpatch%ncohorts
 	  		cpatch%m_coef(ico) = max(1e-6,min(1.0,1 / (1 + (cpatch%psi_leaf(ico) / leaf_psi50(ipft)) ** 10.0)))
 			cpatch%rl_flow(ico) = J_rl
 			cpatch%sr_flow(ico) = J_sr
-if(isnan(J_sr))print*,'org_psi_stem',org_psi_stem,'ap',ap,'bp',bp,'c_stem',c_stem,'weighted_cond',weighted_conductance
+if(isnan(J_sr))print*,'org_psi_stem',org_psi_stem,'ap',ap,'bp',bp,'c_stem',c_stem,'weighted_cond',weighted_conductance,&
+			'weighted_soil_psi',weighted_soil_psi,'J_rl',J_rl,'layer_psi',layer_psi,'stem_cond',stem_cond,'c_leaf',&
+			'transp',transp,'lai',cpatch%lai(ico),'bsapwood',cpatch%bsapwood(ico)
 		 ! update averaged and daily values
 		 if(ifoutput > 0) then
 		 	cpatch%avg_psi_stem(ico) = cpatch%avg_psi_stem(ico) + cpatch%psi_stem(ico)
@@ -1130,12 +1140,22 @@ if(isnan(J_sr))print*,'org_psi_stem',org_psi_stem,'ap',ap,'bp',bp,'c_stem',c_ste
 								(initp%soil_tempk(k) - tsupercool8)
 
 		enddo
+
+		! calculate nitrogen uptake
+!		N_con = csite%mineralized_soil_N(ipa) / &
+!            (  sum(csite%soil_water(nlsl:nzg,ipa) * dslz(nlsl:nzg)) * wdns)
+
+!		N_uptake = max(0.0,N_con * sum(real(tmp_water_supply(nlsl:nzg))) / cpatch%nplant(ico))
+!		! kgN/kgH2O * kgH2O/m2 / /m2 = kgN
+
+!		cpatch%N_uptake(ico) = cpatch%N_uptake(ico) + N_uptake
 if (.false.) then
-	  print*,'ico',ico
+	  print*,'ico',ico,'pft',cpatch%pft(ico),'dbh',cpatch%dbh(ico),'krdepth',cpatch%krdepth(ico)
 	  print*,'hour',current_time%hour,'psi_stem',cpatch%psi_stem(ico)
 	  print*,'psi_leaf',cpatch%psi_leaf(ico)
 	  print*,'J_sr',J_sr,'J_rl',J_rl,'T',transp / cpatch%nplant(ico)
 	  print*,'tmp_water_supply',tmp_water_supply
+	  print*,'water_supply_frac',cpatch%water_supply_layer_frac(:,ico)
 	  print*,'m_coef',cpatch%m_coef(ico),'psi_open',cpatch%psi_open(ico)
 print*,'water_supply sum norm',sum(real(tmp_water_supply))/cpatch%water_supply(ico) / dtlsm
 	  print*,'top soil water',initp%soil_water(18:20)

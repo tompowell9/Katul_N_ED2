@@ -152,6 +152,7 @@ subroutine read_ed10_ed20_history_file
    real(kind=8)                                           :: dpsc
    real(kind=8)                                           :: dmsn
    real(kind=8)                                           :: dfsn
+   real(kind=8)                                           :: dslsn
    !----- External function. --------------------------------------------------------------!
    real                 , external                        :: sngloff
    real                 , external                        :: dist_gc
@@ -311,7 +312,7 @@ subroutine read_ed10_ed20_history_file
                case(2,6)
                   !----- Standard ED-2.0 file. --------------------------------------------!
                   read(unit=12,fmt=*,iostat=ierr) time(ip),pname(ip),trk(ip),dage,darea    &
-                                                 ,dwater(1),dfsc,dstsc,dstsl,dssc,dummy    &
+                                                 ,dwater(1),dfsc,dstsc,dstsl,dssc,dslsn    &
                                                  ,dmsn,dfsn
 
                   !------------------------------------------------------------------------!
@@ -328,7 +329,7 @@ subroutine read_ed10_ed20_history_file
                   ssc    (ip) = sngloff(dssc     ,min_ok  )
                   msn    (ip) = sngloff(dmsn     ,min_ok  )
                   fsn    (ip) = sngloff(dfsn     ,min_ok  )
-                  slsn   (ip) = sngloff(dfsn     ,min_ok  )!ATT
+                  slsn   (ip) = sngloff(dslsn     ,min_ok  )!ATT
                   water(1,ip) = sngloff(dwater(1),min_ok  )
                   
                case(3)

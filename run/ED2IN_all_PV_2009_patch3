@@ -271,8 +271,8 @@ $ED_NL
    ! FFILOUT -- Path and prefix for analysis files (all but history/restart).              !
    ! SFILOUT -- Path and prefix for history files.                                         !
    !---------------------------------------------------------------------------------------!
-   NL%FFILOUT = '/scratch/gpfs/xiangtao/LEAF_DROP/kss_Nlim_test_2014_patch3'
-   NL%SFILOUT = '/scratch/gpfs/xiangtao/LEAF_DROP/kss_Nlim_test_2014_patch3'
+   NL%FFILOUT = '/scratch/gpfs/xiangtao/LEAF_DROP/kss_Nlim_RdHom_patch3'
+   NL%SFILOUT = '/scratch/gpfs/xiangtao/LEAF_DROP/kss_Nlim_RdHom_patch3'
    !---------------------------------------------------------------------------------------!
 
 
@@ -607,7 +607,7 @@ $ED_NL
    !               to have root depths of 5m and grasses/seedlings at 0.5 to have root     !
    !               depth of 0.5 m.                                                         !
    !---------------------------------------------------------------------------------------!
-   NL%IALLOM          = 0
+   NL%IALLOM          = 3
    !---------------------------------------------------------------------------------------!
 
 

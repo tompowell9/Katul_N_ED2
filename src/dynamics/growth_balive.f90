@@ -122,7 +122,7 @@ module growth_balive
 !				These are not compatible with XXT's TDF phenology scheme
 
 
-
+!if(ico == 2) print*,'bstorage before growth balive',cpatch%bstorage(ico)
                   
                   !----- Set allocation factors. ------------------------------------------!
                   salloc  = 1.0 + qsw(ipft) * cpatch%hite(ico) + q(ipft)
@@ -215,13 +215,26 @@ module growth_balive
                           )) 
                      nl_broot = cpatch%broot(ico) * nl_fraction
                      
-                     N_supply = cpatch%nstorage(ico) + &
-                          nl_broot / total_nl_broot  * &  ! kgC plant-1 / kgC 	m-2
-                          csite%mineralized_soil_N(ipa)
+!                     N_supply = cpatch%nstorage(ico) + &
+!                          nl_broot / total_nl_broot  * &  ! kgC plant-1 / kgC 	m-2
+!                          csite%mineralized_soil_N(ipa)
                      ! Assumption about N demand
                      ! Here we assume the potential demand of trees is the nitrogen
                      ! required to put all the carbon balance into leaf/root which
                      ! is nitrogen rich.
+
+					 ! XXT calculated N_uptake in rk4_driver coupled with water
+					 cpatch%nitrogen_uptake(ico) = min(nl_broot / total_nl_broot *		 &
+												 csite%mineralized_soil_N(ipa),&
+							 					cpatch%nstorage_min(ico) * &
+												nstorage_max_factor -  &
+												cpatch%nstorage(ico))
+					 csite%total_plant_nitrogen_uptake(ipa) =  &
+					 csite%total_plant_nitrogen_uptake(ipa) + &
+				 	cpatch%nitrogen_uptake(ico) * cpatch%nplant(ico)
+
+					cpatch%nstorage(ico) = cpatch%nstorage(ico) + cpatch%nitrogen_uptake(ico)
+					 N_supply = cpatch%nstorage(ico)
                      
                      N_demand = max(0.0,carbon_balance_pot / c2n_leaf(ipft)) ! in case cb is negative
 
@@ -237,13 +250,12 @@ module growth_balive
                      ! Update nstorage according to soil nitrogen
                      ! can't exceed max_nstorage
                      ! ----------------------------------------------------------------------!
-                     old_nstorage = cpatch%nstorage(ico) 
-                     cpatch%nstorage(ico) = min(nstorage_max_factor * cpatch%nstorage_min(ico),N_supply)
-!	if(ico == 1) print*,'nstorage_max',nstorage_max_factor * cpatch%nstorage_min(ico),'N_supply', N_supply,&
-!					'cpatch%nstorage',cpatch%nstorage(ico)
-                     csite%total_plant_nitrogen_uptake(ipa) =  & 
-                          csite%total_plant_nitrogen_uptake(ipa) + &
-                          (cpatch%nstorage(ico) - old_nstorage) * cpatch%nplant(ico)
+!                     old_nstorage = cpatch%nstorage(ico) 
+!                     cpatch%nstorage(ico) = min(nstorage_max_factor * cpatch%nstorage_min(ico),N_supply)
+!	if(ico == 1) print*,'N_supply', N_supply,'cpatch%nstorage',cpatch%nstorage(ico),'fsn',cpatch%fsn(ico)
+!                     csite%total_plant_nitrogen_uptake(ipa) =  & 
+!                          csite%total_plant_nitrogen_uptake(ipa) + &
+!                          (cpatch%nstorage(ico) - old_nstorage) * cpatch%nplant(ico)
 	if(isnan(csite%total_plant_nitrogen_uptake(ipa))) then
 		print*,'nan plant update ico',ico,'old_nstorage',old_nstorage,'N_supply',N_supply,&
 				'nstorage',cpatch%nstorage(ico),'nlsl',nlsl
@@ -254,6 +266,8 @@ module growth_balive
                      ! give the plant plenty of nitrogen so that they are not
                      ! limited
                   endif
+
+				  cpatch%nitrogen_uptake(ico) = 0.0  ! zero N_uptake
 
                   !------------------------------------------------------------------------!
                   !      Allocate plant carbon balance to balive and bstorage.             !
@@ -306,6 +320,7 @@ module growth_balive
                  !----- Update the stability status. -------------------------------------!
                   call is_resolvable(csite,ipa,ico,csite%green_leaf_factor(:,ipa))
 
+!if(ico == 2) print*,'bstorage after growth balive',cpatch%bstorage(ico)
                end do
                    !----- Update litter. ----------------------------------------------------!
 !print*,'litter'
@@ -400,8 +415,6 @@ module growth_balive
             do ipa = 1,csite%npatches
                cpatch => csite%patch(ipa)
 
-               !----- Reset averaged variables. -------------------------------------------!
-               csite%total_plant_nitrogen_uptake(ipa) = 0.0
 
                !----- Loop over cohorts. --------------------------------------------------!
                do ico = 1,cpatch%ncohorts
@@ -636,6 +649,8 @@ module growth_balive
                                                - cpatch%today_leaf_resp(ico)               &
                                                - cpatch%today_root_resp(ico))              &
                                              / cpatch%nplant(ico)
+!	if (ico == 10) print*,'npp/gpp', daily_C_gain / umol_2_kgC / day_sec  * &
+!	cpatch%nplant(ico) / cpatch%today_gpp(ico)
       else
          daily_C_gain = 0.0
       end if
@@ -788,7 +803,6 @@ module growth_balive
       real                           :: delta_broot
       real                           :: delta_bsapwood
       real                           :: available_carbon
-      real                           :: f_total
       real                           :: f_bleaf
       real                           :: f_broot
       real                           :: f_bsapwood
@@ -811,8 +825,8 @@ module growth_balive
       if(carbon_balance + cpatch%bstorage(ico) > 0.)then
       
          available_carbon = cpatch%bstorage(ico) + carbon_balance
-         if (cpatch%phenology_status(ico) /= 0) then 
-            ! when trees are not on allometry
+!         if (cpatch%phenology_status(ico) /= -1) then 
+            ! when trees are growing
             !------------------------------------------------------------------------------!
             !     Maximum bleaf that the allometric relationship would allow.  If the      !
             ! plant is drought stress (elongf < 1), we do not allow the plant to get back  !
@@ -820,16 +834,14 @@ module growth_balive
             !------------------------------------------------------------------------------!
             bl_max     = dbh2bl(cpatch%dbh(ico),ipft) * green_leaf_factor                  &
                  * cpatch%elongf(ico)
-            br_max     = dbh2bl(cpatch%dbh(ico),ipft) * q(ipft)
+            br_max     = dbh2bl(cpatch%dbh(ico),ipft) * q(ipft) * (	cpatch%elongf(ico) + 1.0) / 2.0
             bsapwood_max = dbh2bs(cpatch%dbh(ico),ipft)
 			
-            delta_bleaf = bl_max - cpatch%bleaf(ico)
-            delta_broot = br_max - cpatch%broot(ico)
-            delta_bsapwood = bsapwood_max - cpatch%bsapwood(ico)
+            delta_bleaf = max(0.,bl_max - cpatch%bleaf(ico))
+            delta_broot = max(0.,br_max - cpatch%broot(ico))
+            delta_bsapwood = max(0.,bsapwood_max - cpatch%bsapwood(ico))
 
-            balive_max = bl_max + br_max + bsapwood_max
-
-            carbon_demand = max(0.,balive_max - cpatch%balive(ico)) 
+            carbon_demand = delta_bleaf + delta_broot + delta_bsapwood
 	!		carbon_demand can't be negative
             
             ! first determine the actual carbon demand and nitrogen demand
@@ -839,10 +851,10 @@ module growth_balive
                carbon_demand = available_carbon
                nitrogen_demand = carbon_demand / c2n_leaf(ipft)
             endif
-    
+
             ! then update the bstorage and nstorage
             if (cpatch%nstorage(ico) >= nitrogen_demand) then
-               cpatch%bstorage(ico) = available_carbon - carbon_demand  ! 0
+               cpatch%bstorage(ico) = available_carbon - carbon_demand 
                cpatch%nstorage(ico) = cpatch%nstorage(ico) - nitrogen_demand
             else ! not enough nitrogen
                carbon_demand = carbon_demand * (cpatch%nstorage(ico) /	nitrogen_demand)
@@ -850,24 +862,26 @@ module growth_balive
                cpatch%bstorage(ico) = available_carbon - carbon_demand
             endif
 
-            !finally update balive
-            cpatch%balive(ico) = cpatch%balive(ico) + carbon_demand
             ! let broot and bleaf grow first
-            f_bleaf = delta_bleaf / (delta_bleaf +delta_broot)
-            f_broot = delta_broot / (delta_bleaf +delta_broot)
-
-			if (isnan(f_bleaf) .or. isnan(f_broot)) then
-				f_bleaf = 0.0
-				f_broot = 0.0
+			if (delta_bleaf == 0. .and. delta_broot == 0.) then
+				f_bleaf = 0.
+				f_broot = 0.
+			else
+            	f_bleaf = delta_bleaf / (delta_bleaf +delta_broot)
+	            f_broot = delta_broot / (delta_bleaf +delta_broot)
 			endif
             
             tr_bleaf = min(delta_bleaf,carbon_demand * f_bleaf)
             tr_broot = min(delta_broot,carbon_demand * f_broot)
-            tr_bsapwood = max(0.0, carbon_demand - delta_bleaf - delta_broot)
-
+            tr_bsapwood = min(delta_bsapwood,carbon_demand - tr_bleaf - tr_broot)
+!if(ico == 1) print*,'delta_bleaf',delta_bleaf,'delta_broot',delta_broot
+!if(ico == 1) print*,'delta_sapwood',delta_bsapwood,'carbon_demand',carbon_demand
+!if(ico == 1) print*,'tr_bleaf',tr_bleaf,'tr_broot',tr_broot,'tr_bsapwood',tr_bsapwood
             cpatch%bleaf(ico) = cpatch%bleaf(ico) +  tr_bleaf
             cpatch%broot(ico) = cpatch%broot(ico) +  tr_broot
             cpatch%bsapwood(ico) = cpatch%bsapwood(ico) + tr_bsapwood
+            !finally update balive
+            cpatch%balive(ico) = cpatch%balive(ico) + carbon_demand
 
             cpatch%today_nppleaf(ico) = tr_bleaf * cpatch%nplant(ico)
             cpatch%today_nppfroot(ico) = tr_broot * cpatch%nplant(ico)
@@ -887,13 +901,13 @@ module growth_balive
 !            else
 !               cpatch%phenology_status(ico) = 2
 !            endif
-         else  ! The canopy is full
-            cpatch%bstorage(ico) = available_carbon
-            cpatch%today_nppleaf(ico) = 0.
-            cpatch%today_nppfroot(ico) = 0.
-            cpatch%today_nppsapwood(ico) = 0.
-            cpatch%today_nppdaily(ico) = carbon_balance * cpatch%nplant(ico)
-         endif
+!         else  ! The canopy is full
+!            cpatch%bstorage(ico) = available_carbon
+!            cpatch%today_nppleaf(ico) = 0.
+!            cpatch%today_nppfroot(ico) = 0.
+!            cpatch%today_nppsapwood(ico) = 0.
+!            cpatch%today_nppdaily(ico) = carbon_balance * cpatch%nplant(ico)
+!         endif
 
 
       else   ! CB + bstorage < 0
@@ -906,21 +920,21 @@ module growth_balive
          ! if burn off bleaf and broot is not enough, burn off sapwood
          sapwood_burnoff = max(0.0,total_burnoff - (cpatch%bleaf(ico) + &
               cpatch%broot(ico)))  
-
-         f_bleaf = cpatch%bleaf(ico) / (cpatch%bleaf(ico) + cpatch%broot(ico))
-         f_broot = cpatch%broot(ico) / (cpatch%bleaf(ico) + cpatch%broot(ico))
-
-		 if (isnan(f_bleaf) .or. isnan(f_broot)) then
-				f_bleaf = 0.0
-				f_broot = 0.0
+		 if (cpatch%bleaf(ico) == 0. .and. cpatch%broot(ico) == 0.) then
+		 	f_bleaf = 0.
+			f_broot = 0.
+		 else
+	         f_bleaf = cpatch%bleaf(ico) / (cpatch%bleaf(ico) + cpatch%broot(ico))
+    	     f_broot = cpatch%broot(ico) / (cpatch%bleaf(ico) + cpatch%broot(ico))
 		 endif
+
 		 
          cpatch%bleaf(ico)    = max(0.0,cpatch%bleaf(ico) - f_bleaf *   (total_burnoff - sapwood_burnoff))
          cpatch%broot(ico)    = max(0.0,cpatch%broot(ico) - f_broot *   (total_burnoff - sapwood_burnoff))
 
          cpatch%bsapwood(ico) = max(0.0,cpatch%bsapwood(ico) -   sapwood_burnoff)
  
-         cpatch%balive(ico)   = cpatch%balive(ico) - total_burnoff
+         cpatch%balive(ico)   = max(0.,cpatch%balive(ico) - total_burnoff)
 
 !         if (cpatch%phenology_status(ico) >= 0) then
 !            !We only need to update phenology_status when its bigger than 0	

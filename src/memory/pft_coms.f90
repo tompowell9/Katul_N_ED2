@@ -170,6 +170,11 @@ module pft_coms
    !----- Slope of the Ball/Berry stomatal conductance-photosynthesis relationship. -------!
    real, dimension(n_pft) :: stomatal_slope
 
+   !----- marginal water use efficiency in Katul's stomatal scheme
+   real, dimension(n_pft) :: lambda0  ! micromol/mol/kPa
+   !----- lambda sensitivity to leaf water potential according to Manzoni et al.
+   !2011
+   real, dimension(n_pft) :: beta0   ! m-1
    !----- Intercept of the Ball/Berry stomatal conductance relationship [µmol/m2/s]. ------!
    real, dimension(n_pft) :: cuticular_cond
 
