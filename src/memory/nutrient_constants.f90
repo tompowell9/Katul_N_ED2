@@ -12,7 +12,7 @@ module nutrient_constants
   ! N deposition for boreal forests take from Piiraine et al 1998 Biogeochemical Investigations at Watershed, Landscape, and Regional Scales 
   real, parameter :: leaching_efficiency_factor = 0.01  !fraction of N that can be lost by leaching from mineralized_soil_N 
   real, parameter :: soil_depth = 1.5                   !used to calcualte leaching (meters) 1.5 from (Jackson 1996)
-  real, parameter :: nstorage_max_factor = 1.33          !maximum storage capacity of N = amount in leaves * nstorge_max_factor
+  real, parameter :: nstorage_max_factor = 5.0          !maximum storage capacity of N = amount in leaves * nstorge_max_factor
   real, parameter :: gas_loss_rate = 0.2                !gas loss is approximately 20% of total N loss (Houlton et al 2006 PNAS) if the site has                                                                         !2700 mm rain/yr or less but is about 50% gas loss if > 2700 mm 
 
   !! Constants for forest organic layer
