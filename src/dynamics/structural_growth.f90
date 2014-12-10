@@ -174,36 +174,32 @@ subroutine structural_growth(cgrid, month)
                !----- Reset monthly_dndt. -------------------------------------------------!
                cpatch%monthly_dndt(ico) = 0.0
 
-			   available_bstorage = max(0.0, cpatch%bstorage(ico) - cpatch%bstorage_min(ico))  ! extra carbon
-			   available_nstorage = max(0.0, cpatch%nstorage(ico) - cpatch%nstorage_min(ico))  ! extra carbon
+               available_bstorage = max(0.0, cpatch%bstorage(ico) - cpatch%bstorage_min(ico))  ! extra carbon
+               available_nstorage = max(0.0, cpatch%nstorage(ico) - cpatch%nstorage_min(ico))  ! extra carbon
 	           
 
                call plant_structural_allocation(cpatch%pft(ico),cpatch%hite(ico)           &!ATT
-                                            ,cgrid%lat(ipy),month                          &
-                                            ,cpatch%phenology_status(ico),f_bseeds,f_bdead)
+                    ,cgrid%lat(ipy),month                          &
+                    ,cpatch%phenology_status(ico),f_bseeds,f_bdead)
 
-			   ! Determine the actual carbon available for growth
-			   deadwood_ratio = cpatch%bdead(ico) / (cpatch%bdead(ico) +cpatch%bsapwood(ico))   ! deadwood/sapwood ratio
-			   struct_nitrogen_demand = available_bstorage * f_bdead * deadwood_ratio /  c2n_stem(ipft) + &
-			   							available_bstorage * f_bdead * (1 - deadwood_ratio) / c2n_leaf(ipft) + &
-										available_bstorage * f_bseeds /	c2n_recruit(ipft)
-			   if (available_bstorage > 0. .and. struct_nitrogen_demand > 0.) then
-				   actual_available_bstorage = available_bstorage * &
-			   							   min(1.0,available_nstorage / struct_nitrogen_demand)  ! consider nitrogen limitation
-			   else
-			   	   actual_available_bstorage = 0.   ! otherwise actual_vailable_bstorage will have nan values...
-			   endif
+               ! Determine the actual carbon available for growth
+               deadwood_ratio = cpatch%bdead(ico) / (cpatch%bdead(ico) +cpatch%bsapwood(ico))   ! deadwood/sapwood ratio
+               struct_nitrogen_demand = available_bstorage * f_bdead * deadwood_ratio /  c2n_stem(ipft) + &
+                    available_bstorage * f_bdead * (1 - deadwood_ratio) / c2n_leaf(ipft) + &
+                    available_bstorage * f_bseeds /	c2n_recruit(ipft)
+               if (available_bstorage > 0. .and. struct_nitrogen_demand > 0.) then            
+                    actual_available_bstorage = available_bstorage * &
+                       min(1.0,available_nstorage / struct_nitrogen_demand)  ! consider nitrogen limitation
+               else
+                  actual_available_bstorage = 0.   ! otherwise actual_vailable_bstorage will have nan values...
+               endif
 
-				! update bdead, bstorage and nstorage
-!if(ico == 2) &
-!print*,'actual_available_bstorage',actual_available_bstorage,'bstorage_min',cpatch%bstorage_min(ico),'nstorage_min',cpatch%nstorage_min(ico),&
-!	'f_bdead',f_bdead,'deadwood_ratio',deadwood_ratio
                !----- Grow plants; bdead gets fraction f_bdead of bstorage. ---------------!
                cpatch%bdead(ico) = cpatch%bdead(ico) + f_bdead * actual_available_bstorage * deadwood_ratio
-			   if(isnan(cpatch%bdead(ico))) then
-	print*,'ico',ico,'f_bdead',f_bdead,'available_nstorage',available_nstorage,'struct_nitrogen_demand',struct_nitrogen_demand,&
-		'dead_wood_ratio',deadwood_ratio,'f_bseeds',f_bseeds,'available_bstorage',available_bstorage
-				endif
+               if(isnan(cpatch%bdead(ico))) then
+                  print*,'ico',ico,'f_bdead',f_bdead,'available_nstorage',available_nstorage,'struct_nitrogen_demand',struct_nitrogen_demand,&
+                       'dead_wood_ratio',deadwood_ratio,'f_bseeds',f_bseeds,'available_bstorage',available_bstorage
+               endif
                !------ NPP allocation to wood and course roots in KgC /m2 -----------------!
                cpatch%today_NPPwood(ico) = agf_bs * f_bdead * actual_available_bstorage * deadwood_ratio         &
                                           * cpatch%nplant(ico)
@@ -221,16 +217,27 @@ subroutine structural_growth(cgrid, month)
                
                seed_litter        = cpatch%bseeds(ico) * cpatch%nplant(ico)                &
                                   * mort_fac * seedling_mortality(ipft)
+               if(isnan(seed_litter)) then
+                  print*,'bseeds',cpatch%bseeds(ico),'nplant',cpatch%nplant(ico),'mort_fac',mort_fac,'seedling_mortality',seedling_mortality(ipft),'actual_available_bstorage',actual_available_bstorage,'available_bstorage',available_bstorage,'available_nstorage',available_nstorage,'struct_nitrogen_demand',struct_nitrogen_demand
+               endif
 
                nloss=nloss+csite%area(ipa)*seed_litter/c2n_recruit(ipft)               
 
 			   ! update bstorage and nstorage
                cpatch%bstorage(ico) = cpatch%bstorage(ico)  -	 & 
 					actual_available_bstorage * (f_bdead * deadwood_ratio + f_bseeds)
-               cpatch%nstorage(ico) = cpatch%nstorage(ico)  -	 & 
-					actual_available_bstorage * (f_bdead * deadwood_ratio / c2n_stem(ipft) + f_bseeds / c2n_recruit(ipft))
+               cpatch%nstorage(ico) = max(cpatch%nstorage(ico)  -	 & 
+					actual_available_bstorage * (f_bdead * deadwood_ratio / c2n_stem(ipft) + f_bseeds / c2n_recruit(ipft)),0.)
+if(cpatch%nstorage(ico) < 0.)then
+print*,'7 Negative nstorage, nstorage',cpatch%nstorage(ico),'actual_available_bstorage',actual_available_bstorage
+endif
 
-!if(ico == 2)print*, 'bstorage after struct',cpatch%bstorage(ico)
+if (ipa == 1 .and. ico == 1) then
+	print*,'actual_available_bstorage',actual_available_bstorage,'f_bdead',f_bdead,'deadwood_ratio',deadwood_ratio
+	print*,'N limitation',available_nstorage / struct_nitrogen_demand 
+	print*,'phenology_status',cpatch%phenology_status(ico)
+endif
+
                n2=n2+csite%area(ipa)*cpatch%nplant(ico)                                    &
                  * (cpatch%balive(ico)/c2n_leaf(cpatch%pft(ico))                           &
                   +cpatch%bdead(ico)/c2n_stem(cpatch%pft(ico))+cpatch%nstorage(ico)        &
@@ -249,6 +256,9 @@ subroutine structural_growth(cgrid, month)
                                  + (f_labile(ipft) * balive_mort_litter / c2n_leaf(ipft)    &
                                  + seed_litter / c2n_recruit(ipft)                         &
                                  + nstorage_mort_litter) * f_fast(ipft)  
+if(isnan(csite%slsn_in(ipa)))then
+print*,'balive_mort_litter',balive_mort_litter,'seed_litter',seed_litter,'nstorage_mort_litter',nstorage_mort_litter,'bstorage_mort_litter',bstorage_mort_litter
+endif
 
                csite%ssc_in(ipa) = csite%ssc_in(ipa) + struct_litter                       &
                                  + (1.0 - f_labile(ipft)) * balive_mort_litter
@@ -583,7 +593,7 @@ subroutine plant_structural_allocation(ipft,hite,lat,month,phen_status,f_bseeds,
    ! thing to reproduction or growth if it is not the right time of year (for cold         !
    ! deciduous plants), or if the plants are actively dropping leaves or off allometry.    !
    !---------------------------------------------------------------------------------------!
-   if ((phenology(ipft) /= 2   .or.  late_spring) .and. (phen_status == 0))then!ATT
+   if ((phen_status == 0))then!ATT
       if (is_grass(ipft) .and. hite >= hgt_max(ipft)) then
          !---------------------------------------------------------------------------------!
          !    Grasses have reached the maximum height, stop growing in size and send       !
@@ -664,11 +674,17 @@ subroutine update_derived_cohort_props(cpatch,ico,green_leaf_factor,lsl)
          cpatch%sla(ico) = SLA(cpatch%pft(ico)) *  &
                 max(0.55, min(1.00, &
                         1.00 - max(0.0,min((cpatch%hite(ico) - 5.)/25.0,1.0)) * 0.45))
+     case (21,22)
+        cpatch%hite_coef(ico) = 1.0
+        cpatch%sla(ico) = SLA(cpatch%pft(ico))
                 
    end select
 
    ! update bstorage_min and nstorage_min
    cpatch%bstorage_min(ico) = dbh2bl(cpatch%dbh(ico),cpatch%pft(ico)) * (1 + q(cpatch%pft(ico)))
+   if (cpatch%bstorage_min(ico) < 1.0e-8) then
+      cpatch%bstorage_min(ico) = 0.
+   endif
    cpatch%nstorage_min(ico) = cpatch%bstorage_min(ico) / c2n_leaf(cpatch%pft(ico))
 
    !----- Check the phenology status and whether it needs to change. ----------------------!
