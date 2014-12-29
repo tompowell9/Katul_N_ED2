@@ -1427,6 +1427,7 @@ subroutine init_pft_photo_params()
    dark_respiration_factor(21)    = 0.020
    dark_respiration_factor(22)    = 0.040
    dark_respiration_factor(23:35) = 0.02
+   dark_respiration_factor(29) = 0.03
 
    !---------------------------------------------------------------------------------------!
 
@@ -1546,13 +1547,8 @@ subroutine init_pft_photo_params()
         water_conductance(ipft) = exp(-1.55 * rho(ipft) + 1.71) !max(1.0,min(3.5,-3.8 * rho(ipft) + 4.6)) ! kg H2O /m /s/Mpa
         TLP(ipft)  = 102. * (-4.65 + 0.695 * log(SLA(ipft)) - 1.08 * log(rho(ipft)))
 		leaf_psi50(ipft) = (TLP(ipft) / 102. * 0.7 - 0.4) * 102.  ! from Brodribb et al. 2002
-		Vm0(ipft) = (-10. * min(0.4,max(0.0,(rho(ipft) - 0.4))) + 14) * 1.0  ! According to Anet in Santiago et al. 2004 and Pineda-Garcia et al. 2011
+		Vm0(ipft) = (-10. * min(0.4,max(0.0,(rho(ipft) - 0.4))) + 14) * 0.6  ! According to Anet in Santiago et al. 2004 and Pineda-Garcia et al. 2011
    enddo
-   Vm0(23) = 9.0 * 0.8
-   Vm0(24) = 8.5 * 0.8
-   Vm0(26) = 9.0 * 0.8
-   Vm0(27) = 9.0 * 0.8
-   Vm0(29) = 12.0 * 0.8
 
  Vm0(6) = 11.35 
  psi50(6)= -2.6*102 !Aspinwall 2011 table 3
@@ -1993,7 +1989,7 @@ subroutine init_pft_mort_params()
    seedling_mortality(18:20)  = 0.95
    seedling_mortality(21)   = 0.95
    seedling_mortality(22)   = 0.95
-   seedling_mortality(23:35) = 1.00 !0.95
+   seedling_mortality(23:35) = 1.00!0.95 !0.95
 
    !seedling_mortality=0.critical height survivorship
    treefall_s_gtht(1:35)    = 0.0
@@ -2093,6 +2089,7 @@ subroutine init_pft_alloc_params()
 						  , SRA					  &
 						  , root_dens! ! intent(out)
    use allometry   , only : h2dbh                 & ! function
+   						  , dbh2h				  &
                           , dbh2bd                ! ! function
    use consts_coms , only : twothirds             & ! intent(in)
                           , pi1                   ! ! intent(in)
@@ -2484,7 +2481,7 @@ subroutine init_pft_alloc_params()
    end do
    max_dbh(21) = 30.!20. !19.3 ATT
    max_dbh(22) = 30.!13. !12.8 ATT
-
+   max_dbh(23:35) = 60.
    !---------------------------------------------------------------------------------------!
    !     DBH-leaf allometry.  Assign temperate PFTs outside the loop, and the tropical     !
    ! ones inside the loop.                                                                 !
