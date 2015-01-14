@@ -160,7 +160,8 @@ module growth_balive
                   temp_dep = 1.0
                   !------------------------------------------------------------------------!
 
-                  cpatch%storage_respiration(ico) = cpatch%bstorage(ico)                   &
+                  cpatch%storage_respiration(ico) = max(0.,   							   &
+						  						  cpatch%bstorage(ico) - cpatch%bstorage_min(ico) &
                                                   * storage_turnover_rate(ipft)            &
                                                   * tfact * temp_dep
 
