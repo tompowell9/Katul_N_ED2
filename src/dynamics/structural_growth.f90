@@ -28,6 +28,7 @@ subroutine structural_growth(cgrid, month)
    use ed_therm_lib  , only : calc_veg_hcap          & ! function
                             , update_veg_energy_cweh ! ! function
    use allometry     , only:  dbh2bl                 ! ! function
+   use ed_misc_coms , only : current_time       ! ! intent(in)
    use nutrient_constants, only: organic_matter_density &
                                , crit_olayer_min        &
                                , crit_olayer_max        &
@@ -195,7 +196,10 @@ subroutine structural_growth(cgrid, month)
                endif
 
                !----- Grow plants; bdead gets fraction f_bdead of bstorage. ---------------!
-               cpatch%bdead(ico) = cpatch%bdead(ico) + f_bdead * actual_available_bstorage * deadwood_ratio
+			   if(current_time%year > 2008 .or. .true. ) then  !start growing from 2009
+	               cpatch%bdead(ico) = cpatch%bdead(ico) + f_bdead * actual_available_bstorage * deadwood_ratio
+			   endif
+
                if(isnan(cpatch%bdead(ico))) then
                   print*,'ico',ico,'f_bdead',f_bdead,'available_nstorage',available_nstorage,'struct_nitrogen_demand',struct_nitrogen_demand,&
                        'dead_wood_ratio',deadwood_ratio,'f_bseeds',f_bseeds,'available_bstorage',available_bstorage
@@ -224,10 +228,14 @@ subroutine structural_growth(cgrid, month)
                nloss=nloss+csite%area(ipa)*seed_litter/c2n_recruit(ipft)               
 
 			   ! update bstorage and nstorage
+			   if (current_time%year > 2008 .or. .true.) then
                cpatch%bstorage(ico) = cpatch%bstorage(ico)  -	 & 
 					actual_available_bstorage * (f_bdead * deadwood_ratio + f_bseeds)
                cpatch%nstorage(ico) = max(cpatch%nstorage(ico)  -	 & 
 					actual_available_bstorage * (f_bdead * deadwood_ratio / c2n_stem(ipft) + f_bseeds / c2n_recruit(ipft)),0.)
+			   else
+			   cpatch%bstorage(ico) = cpatch%bstorage(ico) - actual_available_bstorage
+			   endif
 if(cpatch%nstorage(ico) < 0.)then
 print*,'7 Negative nstorage, nstorage',cpatch%nstorage(ico),'actual_available_bstorage',actual_available_bstorage
 endif
@@ -593,7 +601,7 @@ subroutine plant_structural_allocation(ipft,hite,lat,month,phen_status,f_bseeds,
    ! thing to reproduction or growth if it is not the right time of year (for cold         !
    ! deciduous plants), or if the plants are actively dropping leaves or off allometry.    !
    !---------------------------------------------------------------------------------------!
-   if ((phen_status == 0))then!ATT
+   if ((phen_status == 0))then
       if (is_grass(ipft) .and. hite >= hgt_max(ipft)) then
          !---------------------------------------------------------------------------------!
          !    Grasses have reached the maximum height, stop growing in size and send       !
@@ -668,15 +676,16 @@ subroutine update_derived_cohort_props(cpatch,ico,green_leaf_factor,lsl)
    ! gain and within-canopy gradients of associated foliar traits
    ! for Amazon forest trees. Biogesciences
    select case (cpatch%pft(ico))
-     case default
-         cpatch%hite_coef(ico) = max(1.0,min(1.6, & 
-					 1.0 + max(0.0,min((cpatch%hite(ico)-5.)/25.0,1.0)) * 0.6))
-         cpatch%sla(ico) = SLA(cpatch%pft(ico)) *  &
-                max(0.55, min(1.00, &
-                        1.00 - max(0.0,min((cpatch%hite(ico) - 5.)/25.0,1.0)) * 0.45))
-     case (21,22)
+     case (21,22,2,3,4)
         cpatch%hite_coef(ico) = 1.0
         cpatch%sla(ico) = SLA(cpatch%pft(ico))
+
+     case default
+         cpatch%hite_coef(ico) = max(1.0,min(1.40, & 
+					 1.0 + max(0.0,min((cpatch%hite(ico)-5.)/15.0,1.0)) * 0.40))
+         cpatch%sla(ico) = SLA(cpatch%pft(ico)) *  &
+                max(0.65, min(1.00, &
+                        1.00 - max(0.0,min((cpatch%hite(ico) - 5.)/15.0,1.0)) * 0.35))
                 
    end select
 

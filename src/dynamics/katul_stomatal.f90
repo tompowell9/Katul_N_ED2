@@ -118,29 +118,48 @@ Contains
 		Vcmax20 = Vcmax20 / (tlowfun * thighfun)
 	elseif (temp_scheme == 3) then
 		! use 20 degC as reference temperature according to Leuning 1997
+!		call harley_temp_fun(15.+273.15,293.15,&
+!							116.3,  & ! Hv
+!							0.65,   & ! Sv
+!							202.9,  & ! Hd
+!							t_coef)
+		! Farquar's parameter
 		call harley_temp_fun(15.+273.15,293.15,&
-							116.3,  & ! Hv
-							0.65,   & ! Sv
-							202.9,  & ! Hd
+							58.52,  & ! Hv
+							0.,   & ! Sv
+							0.,  & ! Hd
 							t_coef)
 		Vcmax20 = Vm0 / t_coef
 
+!		call harley_temp_fun(Tleaf+273.15,293.15,&
+!							116.3,  & ! Hv
+!							0.65,   & ! Sv
+!							202.9,  & ! Hd
+!							t_coef)
+		! Farquar's parameter
 		call harley_temp_fun(Tleaf+273.15,293.15,&
-							116.3,  & ! Hv
-							0.65,   & ! Sv
-							202.9,  & ! Hd
+							58.52,  & ! Hv
+							0.,   & ! Sv
+							0.,  & ! Hd
 							t_coef)
 		Vcmax = Vcmax20 * t_coef
 !		if(ico == 1) print*,'Vm02Vcmax',t_coef
 
 	endif
 
-    Jmax20 = 2.68 * Vcmax20 ! Leuning 1997 Journal of Experimental Botany
+!    Jmax20 = 2.68 * Vcmax20 ! Leuning 1997 Journal of Experimental Botany
+    Jmax20 = 2.44 * Vcmax20 ! Leuning 1997 Journal of Experimental Botany
     
-	call harley_temp_fun(Tleaf+273.15,293.15,&
-							79.5,  & ! Hv
-							0.65,   & ! Sv
-							201.0,  & ! Hd
+!	call harley_temp_fun(Tleaf+273.15,293.15,&
+!							79.5,  & ! Hv
+!							0.65,   & ! Sv
+!							201.0,  & ! Hd
+!							t_coef)
+		! Farquar's parameter
+		call harley_temp_fun(Tleaf+273.15,293.15,&
+							37.0,  & ! Hv
+							0.71,   & ! Sv
+							220.,  & ! Hd
 							t_coef)
 	Jmax = Jmax20 * t_coef
 
@@ -162,8 +181,10 @@ Contains
     ! Temperature dependence for respiration in the dark.
 	Rd0 = Vcmax20 * dark_respiration_factor(ipft)
 
-	Rdark = Rd0 * exp(46.39/(8.314e-3*293.15) * (1 - 293.15/(Tleaf+273.15))) 
+!	Rdark = Rd0 * exp(46.39/(8.314e-3*293.15) * (1 - 293.15/(Tleaf+273.15))) 
 !	Temp dependence from Harley et al. 1992
+	Rdark = Rd0 * exp(66.4/(8.314e-3*293.15) * (1 - 293.15/(Tleaf+273.15))) 
+!	Temp dependence from Farquar
 
     ! Calculate actual leaf respiration depending on whether or not
     ! the leaf is shaded.
@@ -176,7 +197,12 @@ Contains
 	! correcting for leaf water stress and canopy position
 	Vcmax = Vcmax * hite_coef * m_coef
 	Jmax = Jmax * hite_coef * m_coef
-	Rleaf = Rleaf * hite_coef * m_coef
+	Rleaf = Rleaf * hite_coef * (0.8 + 0.2 * m_coef) 
+	! Rleaf decreases by 50% at most
+	! since dark respiration decreases are not as much as photosyntehsis
+	! Ribas-Carbo et al. 2005; Xu and Baldocci 2002
+	! Galmes et al. 2007 showed differences in Rdark decrease and show that
+	! the decrease of Rdark is coincident with stomatal closure
 	
 	cuticular_gsc = cuticular_cond * 1.0e-6 * &
 		max(0.0,min(1.0, (leaf_psi - (10. * -102.)) / ((10.-2.) * 102.)))
@@ -430,7 +456,7 @@ Contains
 	accepted_gsw = accepted_g * 1.6 * mmdry
 	gsw_cl = cuticular_gsc * 1.6 * mmdry!cuticular_cond * 1.0e-6 * mmdry
 
-	if( isnan(accepted_fc))print*,'par',par,'Anet',accepted_fc,'Vcmax',Vcmax,'Jrate',Jrate*4,'m_coef',m_coef,&
+	if((.false. .and. ico == 40 .and. hite_coef >= 1) .or. isnan(accepted_fc))print*,'par',par,'Anet',accepted_fc,'Vcmax',Vcmax,'Jrate',Jrate*4,'m_coef',m_coef,&
 					'Vm0',Vm0,'Rleaf',Rleaf,'VPD',ei-ea,'gsc',accepted_g,'leaf_temp',Tleaf,&
 					'myg_V',myg_V,'myg_J',myg_J,'myfc_V',myfc_V,'myfc_J',myfc_J,'raero',raero,'testci',testci,&
 					'lambda',lambda, lambda0,'lambda0','beta0',beta0,'leaf_psi',leaf_psi

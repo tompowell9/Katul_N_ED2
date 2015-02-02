@@ -105,8 +105,8 @@ subroutine vegetation_dynamics(new_month,new_year)
             enddo
          enddo
       enddo
-      print*,'DN, INITIAL', 'SoilN',oldsn,'PlantN',oldpn, 'ForestN',oldsn+oldpn,'MSN',oldmsn,'BaliveN', &
-              old_balive,'BdeadN',old_bdead,'NstorageN',old_bstorage
+!      print*,'DN, INITIAL', 'SoilN',oldsn,'PlantN',oldpn, 'ForestN',oldsn+oldpn,'MSN',oldmsn,'BaliveN', &
+!              old_balive,'BdeadN',old_bdead,'NstorageN',old_bstorage
 
       !------------------------------------------------------------------------------------!
       !     The following block corresponds to the daily time-step.                        !
@@ -201,8 +201,8 @@ subroutine vegetation_dynamics(new_month,new_year)
 	      cgrid%PlantN(ipy)            = newpn !JL!
     	  cgrid%SoilN(ipy)             = newsn !JL!
       enddo
-      print*,'DN, FINAL','SoilN',newsn,'PlantN',newpn,'ForestN',newsn+newpn,'MSN', newmsn,'Balive',new_balive,'Bdead',  &
-              new_bdead,'Nstorage',new_bstorage ! 
+!      print*,'DN, FINAL','SoilN',newsn,'PlantN',newpn,'ForestN',newsn+newpn,'MSN', newmsn,'Balive',new_balive,'Bdead',  &
+!              new_bdead,'Nstorage',new_bstorage ! 
      
 
          !----- This is actually the yearly time-step, apply the disturbances. ------------!

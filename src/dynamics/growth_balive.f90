@@ -161,7 +161,7 @@ module growth_balive
                   !------------------------------------------------------------------------!
 
                   cpatch%storage_respiration(ico) = max(0.,   							   &
-						  						  cpatch%bstorage(ico) - cpatch%bstorage_min(ico) &
+						  						  cpatch%bstorage(ico) - cpatch%bstorage_min(ico)) &
                                                   * storage_turnover_rate(ipft)            &
                                                   * tfact * temp_dep
 

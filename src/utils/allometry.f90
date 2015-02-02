@@ -185,6 +185,8 @@ module allometry
         integer, intent(in)    :: ipft
 
         select case (ipft)
+				case (2:4) ! tropical PFTs
+						dbh2bs = dbh2bd(dbh,ipft) / 3. * 7.
 				case (21:30)
                         dbh2bs = b1Bsap(ipft) / C2B * dbh ** b2Bsap(ipft)
                 case default

@@ -1365,9 +1365,9 @@ subroutine init_pft_photo_params()
 
    !------ Vm0 is the maximum photosynthesis capacity in µmol/m2/s. -----------------------!
    Vm0(1)                    = 12.5 !13.75  ! 12.500 * vmfact
-   Vm0(2)                    = 18.750 *1.2  ! 18.750 * vmfact
-   Vm0(3)                    = 12.500 *1.2 ! 12.500 * vmfact
-   Vm0(4)                    =  6.250 *1.2 !  6.250 * vmfact
+   Vm0(2)                    = 18.750  ! 18.750 * vmfact
+   Vm0(3)                    = 12.500 ! 12.500 * vmfact
+   Vm0(4)                    =  6.250 !  6.250 * vmfact
    Vm0(5)                    = 18.300 
    Vm0(6)                    = 11.350 ! 15.625 * 0.7264
    Vm0(7)                    = 11.350 ! 15.625 * 0.7264
@@ -1385,6 +1385,11 @@ subroutine init_pft_photo_params()
    Vm0(21)                   = 21.5!19.0
    Vm0(22)                   = 7.03!10.861
    Vm0(23:35)                = 27 *1.2 !18.750  ! 12.500 * vmfact JL
+   Vm0(29) = 6.0 * 2.5
+   Vm0(23) = 4.5 * 2.5
+   Vm0(26) = 4.5 * 2.5
+   Vm0(27) = 4.5 * 2.5
+   Vm0(24) = 4.0 * 2.5
    !---------------------------------------------------------------------------------------!
 
 
@@ -1407,9 +1412,9 @@ subroutine init_pft_photo_params()
    !    Dark_respiration_factor is the lower-case gamma in Moorcroft et al. (2001).        !
    !---------------------------------------------------------------------------------------!
    dark_respiration_factor(1)     = 0.04 !0.036
-   dark_respiration_factor(2)     = 0.02 !0.02 !0.015 ! 0.020 * gamfact
-   dark_respiration_factor(3)     = 0.02 !0.015 ! 0.020 * gamfact
-   dark_respiration_factor(4)     = 0.02 !0.015 ! 0.020 * gamfact
+   dark_respiration_factor(2)     = 0.005 !0.02 !0.015 ! 0.020 * gamfact
+   dark_respiration_factor(3)     = 0.005 !0.015 ! 0.020 * gamfact
+   dark_respiration_factor(4)     = 0.005 !0.015 ! 0.020 * gamfact
    dark_respiration_factor(5)     = 0.020
    dark_respiration_factor(6)     = 0.020
    dark_respiration_factor(7)     = 0.020
@@ -1426,8 +1431,8 @@ subroutine init_pft_photo_params()
    dark_respiration_factor(18:20) = 0.02 !0.02 !0.015 ! 0.020 * gamfact
    dark_respiration_factor(21)    = 0.020
    dark_respiration_factor(22)    = 0.040
-   dark_respiration_factor(23:35) = 0.02
-   dark_respiration_factor(29) = 0.03
+   dark_respiration_factor(23:35) = 0.025 / 5.
+!   dark_respiration_factor(29) = 0.015
 
    !---------------------------------------------------------------------------------------!
 
@@ -1486,6 +1491,19 @@ subroutine init_pft_photo_params()
  
    ! Mazoni et al. 2011
    lambda0(1:35)     		 =  12.
+
+   !experiment
+   !species with lower TLP also closes their stomatal later (Brodribb et al.
+		   !2002). Also qualitatively by Jennifer's field data
+   !lambda0 ranges from 10. to 20. for arid evergreen in Manzoni et al.
+   lambda0(24)				 = 12.
+
+   lambda0(23)				 = 14.
+   lambda0(26)				 = 14.
+
+   lambda0(27)				 = 16.
+
+   lambda0(29)				 = 20.
 
    beta0(1:35)				 =  -0.13 / 102.
    
@@ -1547,7 +1565,7 @@ subroutine init_pft_photo_params()
         water_conductance(ipft) = exp(-1.55 * rho(ipft) + 1.71) !max(1.0,min(3.5,-3.8 * rho(ipft) + 4.6)) ! kg H2O /m /s/Mpa
         TLP(ipft)  = 102. * (-4.65 + 0.695 * log(SLA(ipft)) - 1.08 * log(rho(ipft)))
 		leaf_psi50(ipft) = (TLP(ipft) / 102. * 0.7 - 0.4) * 102.  ! from Brodribb et al. 2002
-		Vm0(ipft) = (-10. * min(0.4,max(0.0,(rho(ipft) - 0.4))) + 14) * 0.6  ! According to Anet in Santiago et al. 2004 and Pineda-Garcia et al. 2011
+!		Vm0(ipft) = (-7. * min(0.4,max(0.0,(rho(ipft) - 0.4))) + 5.5)  ! According to Anet in Santiago et al. 2004 and Pineda-Garcia et al. 2011
    enddo
 
  Vm0(6) = 11.35 
@@ -1556,7 +1574,7 @@ subroutine init_pft_photo_params()
  TLP(6)= -2.3*102 !Bartlett 2012 
  leaf_psi50(6)= (TLP(6)/102. * 0.7 - 0.4) *102. !same as above 
  
-print*,'TLP',TLP(23:30)
+print*,'TLP',TLP(23:30),'P50',psi50(23:30)
    photosyn_pathway(1)       = 4
    photosyn_pathway(2:4)     = 3
    photosyn_pathway(5)       = 3
@@ -1680,7 +1698,7 @@ subroutine init_pft_resp_params()
    growth_resp_factor(18:20)      = onethird
    growth_resp_factor(21)         = onethird
    growth_resp_factor(22)         = 0.4503
-   growth_resp_factor(23:35)      = 0.65
+   growth_resp_factor(23:35)      = 0.45
 
    leaf_turnover_rate(1)          = 2.0
    leaf_turnover_rate(2)          = 1.0
@@ -1704,7 +1722,7 @@ subroutine init_pft_resp_params()
    leaf_turnover_rate(20)          = onethird
    leaf_turnover_rate(21)         = 0.0
    leaf_turnover_rate(22)         = 0.143
-   leaf_turnover_rate(23:35)      = 0.75
+   leaf_turnover_rate(23:35)      = 0.65
 
    !----- Root turnover rate.  ------------------------------------------------------------!
    root_turnover_rate(1)          = 2.0
@@ -1849,7 +1867,7 @@ subroutine init_pft_mort_params()
    mort1(18:20)  = 10.0
    mort1(21) = 0.1
    mort1(22:22) = 0.1
-   mort1(23:35) = 0.00
+   mort1(23:35) = 0.0 !0.1
 
    mort2(1)  = 20.0
    mort2(2)  = 20.0
@@ -1896,7 +1914,7 @@ subroutine init_pft_mort_params()
    mort3(20)  = 0.0
    mort3(21)  = 0.059!0.0067!0.059 
    mort3(22)  = 0.014! 0.005!0.014
-   mort3(23:35) =  0.0 !(-5 * (rho(23:35) - 0.25) + 3.75) / 100.
+   mort3(23:35) =  0. !(-5 * (rho(23:35) - 0.25) + 3.75) / 100.
 
 
 
@@ -1989,7 +2007,7 @@ subroutine init_pft_mort_params()
    seedling_mortality(18:20)  = 0.95
    seedling_mortality(21)   = 0.95
    seedling_mortality(22)   = 0.95
-   seedling_mortality(23:35) = 1.00!0.95 !0.95
+   seedling_mortality(23:35) = 0.95!0.95 !0.95
 
    !seedling_mortality=0.critical height survivorship
    treefall_s_gtht(1:35)    = 0.0
@@ -2295,7 +2313,7 @@ subroutine init_pft_alloc_params()
    q(18:20) = 1.0
    q(21)    = 1.8889!3.0
    q(22)    = 0.6078!1.104
-   q(23:35) = 0.6
+   q(23:35) = 0.8
 
    sapwood_ratio(1:35) = 3900.0
 
@@ -2481,7 +2499,7 @@ subroutine init_pft_alloc_params()
    end do
    max_dbh(21) = 30.!20. !19.3 ATT
    max_dbh(22) = 30.!13. !12.8 ATT
-   max_dbh(23:35) = 60.
+   max_dbh(23:35) = 40.
    !---------------------------------------------------------------------------------------!
    !     DBH-leaf allometry.  Assign temperate PFTs outside the loop, and the tropical     !
    ! ones inside the loop.                                                                 !
@@ -2540,17 +2558,17 @@ subroutine init_pft_alloc_params()
    end do
    !---------------------------------------------------------------------------------------!
 
-   b1Bl(23)  = 0.0105 * 2!0.0123 * 2 !0.0111 * 2
-   b1Bl(24)  = 0.0170 * 2!0.0190 * 2 !0.0119 * 2
-   b1Bl(26)  = 0.0105 * 2!0.0075 * 2!0.0154 * 2
-   b1Bl(27)  = 0.0092 * 2!0.0093 * 2!0.0076 * 2
-   b1Bl(29)  = 0.0129 * 2!0.0117 * 2!0.0099 * 2
+   b1Bl(23)  = 0.008 * 2.!0.0122 * 2. !0.0105 * 2!0.0123 * 2 !0.0111 * 2
+   b1Bl(24)  = 0.014 * 2.!0.0212 * 2. !0.0170 * 2!0.0190 * 2 !0.0119 * 2
+   b1Bl(26)  = 0.008 * 2.!0.0122 * 2. !0.0105 * 2!0.0075 * 2!0.0154 * 2
+   b1Bl(27)  = 0.007 * 2.!0.0106 * 2. !0.0092 * 2!0.0093 * 2!0.0076 * 2
+   b1Bl(29)  = 0.009 * 2.!0.0135 * 2. !0.0129 * 2!0.0117 * 2!0.0099 * 2
 
-   b2Bl(23)  =  2.0235!1.997
-   b2Bl(24)  =  1.8920!1.925
-   b2Bl(26)  =  2.0235!2.216
-   b2Bl(27)	 =  1.9340!1.967
-   b2Bl(29)  =  1.8490!1.882
+   b2Bl(23)  =  2.1905!2.0105 !2.0235!1.997
+   b2Bl(24)  =  2.059!1.8790 !1.8920!1.925
+   b2Bl(26)  =  2.1905!2.0105 !2.0235!2.216
+   b2Bl(27)	 =  2.1010!1.9210 !1.9340!1.967
+   b2Bl(29)  =  2.0160!1.8360 !1.8490!1.882
 
 
    !---------------------------------------------------------------------------------------!
@@ -2636,41 +2654,48 @@ subroutine init_pft_alloc_params()
    end do
    !---------------------------------------------------------------------------------------!
 
+   ! heartwood accounts for 30% of the total basal area
+   ! for tropical PFTs
+   b1Bs_small(2:4) = 0.3 * b1Bs_small(2:4)
+   b1Bs_big(2:4)   = 0.3 * b1Bs_big(2:4)
+
+
 	b2Bs_small(24)   = 2.32
-	b1Bs_small(24)   = exp(-2.82) / agf_bs
+	b1Bs_small(24)   = exp(-2.80) / agf_bs
 
 	b2Bs_small(26)   = 2.31
 	b1Bs_small(26)   = exp(-2.96) / agf_bs
 
 	b2Bs_small(23)   = 2.31
-	b1Bs_small(23)   = exp(-2.95) / agf_bs
+	b1Bs_small(23)   = exp(-2.96) / agf_bs
 
-	b2Bs_small(27)   = 2.29 !2.30
+	b2Bs_small(27)   = 2.30
 	b1Bs_small(27)   = exp(-2.88) / agf_bs !exp(-2.89) / agf_bs
 
-	b2Bs_small(29)   = 2.36
-	b1Bs_small(29)   = exp(-3.94) / agf_bs
+	b2Bs_small(29)   = 2.35
+	b1Bs_small(29)   = exp(-3.91) / agf_bs
 
-   b1Bs_big(:) = b1Bs_small(:)
-   b2Bs_big(:) = b2Bs_small(:)
+   b1Bs_big(21:30) = b1Bs_small(21:30)
+   b2Bs_big(21:30) = b2Bs_small(21:30)
 
    b1Bsap(1:30) = exp(-2.70) / agf_bs
    b2Bsap(1:30) = 2.02
 
-   b1Bsap(24)   = exp(-1.87) / agf_bs
+
+   b1Bsap(24)   = exp(-1.85) / agf_bs
    b2Bsap(24)   = 2.32
 
-   b1Bsap(23)   = exp(-2.01) / agf_bs
+   b1Bsap(23)   = exp(-2.02) / agf_bs
    b2Bsap(23)   = 2.31
 
-   b1Bsap(26)   = exp(-2.01) / agf_bs
+   b1Bsap(26)   = exp(-2.02) / agf_bs
    b2Bsap(26)   = 2.31
 
    b1Bsap(27)   = exp(-1.94) / agf_bs!exp(-1.95) / agf_bs
    b2Bsap(27)   = 2.30 !2.30
 
-   b1Bsap(29)   = exp(-2.99) / agf_bs
-   b2Bsap(29)   = 2.36
+   b1Bsap(29)   = exp(-2.97) / agf_bs
+   b2Bsap(29)   = 2.35
 
    b1Bsap(6) = 0.0792/0.8*0.1 
    b2Bsap(6)= 2.4349
@@ -2694,7 +2719,7 @@ subroutine init_pft_alloc_params()
    b2Ca(21:22) = 0.8068806
    b2Ca(23:35) =b2Ht(23:35) * 1.888
    !---------------------------------------------------------------------------------------!
-
+   print*,'b1Ca',b1Ca(23:29),'b2Ca',b2Ca(23:39)
 
    !---------------------------------------------------------------------------------------!
    !     DBH-Root depth allometry.  Check which allometry to use.  Notice that b?Rd have   !
@@ -2750,11 +2775,11 @@ subroutine init_pft_alloc_params()
    b2Rd(23:30) =  0.5436442
    b1Rd(23:30) = -0.2185333 * 0.5 * 1.5
    b1Rd(23) = -0.2185333 * 0.5 * 1.2 !rd_m !2.0 
-   b1Rd(24) = -0.2185333 * 0.5 * 1.6 !rd_m !4.0 
+   b1Rd(24) = -0.2185333 * 0.5 * 3.2 !rd_m !4.0 
    b1Rd(25) = -0.2185333 * 0.5 * 1.2 !rd_m !3.0 
    b1Rd(26) = -0.2185333 * 0.5 * 1.2 !rd_m !2.5 
-   b1Rd(27) = -0.2185333 * 0.5 * 1.0 !rd_m !1.5 
-   b1Rd(28) = -0.2185333 * 0.5 * 1.0 !rd_m !3.0 
+   b1Rd(27) = -0.2185333 * 0.5 * 1.2 !rd_m !1.5 
+   b1Rd(28) = -0.2185333 * 0.5 * 1.2 !rd_m !3.0 
    b1Rd(29) = -0.2185333 * 0.5 * 0.8 !rd_m !1.0 
    b1Rd(30) = -0.2185333 * 0.5 * 0.6 !rd_m !3.0 
    if (write_allom) then
@@ -2914,11 +2939,11 @@ c2n_leaf(22)     = 63.0
 c2n_leaf(23:35) = exp(-0.4972 * log(SLA(23:35)) + 4.5071) ! Powers and Tiffin 2010
 print*,'c2n_leaf',c2n_leaf(23:29)
 root_beta(1:35)   = 0.95 ** (200)   ! Jackson et al. 1995
-!root_beta(24)   = 0.96 ** (200)   
-!root_beta(23)   = 0.95 ** (200)   
-!root_beta(26)   = 0.95 ** (200)   
-!root_beta(27)   = 0.94 ** (200)   
-!root_beta(29)   = 0.94 ** (200)   
+root_beta(24)   = 0.98 ** (200)   
+root_beta(23)   = 0.96 ** (200)   
+root_beta(26)   = 0.96 ** (200)   
+root_beta(27)   = 0.96 ** (200)   
+root_beta(29)   = 0.94 ** (200)   
 C_resorption_factor(1:35) = 0.25
 N_resorption_factor(1:35) = 0.48
 
@@ -3002,7 +3027,7 @@ subroutine init_pft_leaf_params()
       phenology(23:35) = 4
    case (4,5)
       phenology(1)     = 4
-      phenology(2:4)   = 4
+      phenology(2:4)   = 5
       phenology(5)     = 4
       phenology(6:8)   = 0
       phenology(9:11)  = 2
@@ -3012,7 +3037,7 @@ subroutine init_pft_leaf_params()
       phenology(18:20) = 3
       phenology(21)    = 2
       phenology(22)    = 0
-      phenology(23:35) = 5
+      phenology(23:35) = 4
    end select
 
    clumping_factor(1)     = 1.000d0

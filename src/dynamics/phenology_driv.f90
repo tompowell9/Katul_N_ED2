@@ -69,9 +69,9 @@ subroutine phenology_driver(cgrid, doy, month, tfact)
             call update_thermal_sums(month, cpoly, isi, cgrid%lat(ipy))
             call update_turnover(cpoly,isi,doy,current_time%year,cgrid%lat(ipy))
 
-!            do ipa = 1, csite%npatches
- !              call update_paw(csite,ipa)
-  !          enddo
+            do ipa = 1, csite%npatches
+               call update_paw(csite,ipa)
+            enddo
 
             call update_phenology(doy,cpoly,isi,cgrid%lat(ipy))
 
@@ -534,62 +534,126 @@ subroutine update_phenology(doy, cpoly, isi, lat)
             !------------------------------------------------------------------------------!
             cpatch%elongf(ico) = max(0.0, min (1.0, cpatch%paw_avg(ico)/theta_crit))
             bl_max             = cpatch%elongf(ico) * dbh2bl(cpatch%dbh(ico),ipft)
-            !print*,ico,cpatch%elongf(ico),cpatch%paw_avg(ico)               
+           !if(ico==1) print*,ico,cpatch%elongf(ico),cpatch%paw_avg(ico)               
             !----- In case it is too dry, drop all the leaves... --------------------------!
             if (cpatch%elongf(ico) < elongf_min) then
                bl_max = 0.0
             end if
             
             delta_bleaf = cpatch%bleaf(ico) - bl_max
+            
+			if(delta_bleaf < -1e-6) then
+                      cpatch%phenology_status(ico) = 1
+            else if (delta_bleaf > 1e-6) then
+                      cpatch%phenology_status(ico) = -1 
+            else if (cpatch%elongf(ico) > 0.9 ) then ! ~ nearly full canopy
+                      cpatch%phenology_status(ico) = 0
+            end if
 
             if (delta_bleaf > 0.0 .and. cpatch%phenology_status(ico) < 2) then
-               cpatch%phenology_status(ico) = -1 
-               cpatch%leaf_drop(ico) = (1.0 - retained_carbon_fraction) * delta_bleaf
-               csite%fsc_in(ipa) = csite%fsc_in(ipa)                                       &
-                                 + cpatch%nplant(ico) * cpatch%leaf_drop(ico)              &
-                                 * f_labile(ipft)
-              csite%fsn_in(ipa) = csite%fsn_in(ipa) + cpatch%nplant(ico)                   &
-                                 * delta_bleaf * f_labile(ipft) / c2n_leaf(ipft)           &
-                                 * (1.0 - N_resorption_factor(ipft)) 
-               csite%ssc_in(ipa) = csite%ssc_in(ipa)                                       &
-                                 + cpatch%nplant(ico) * cpatch%leaf_drop(ico)              &
-                                 * (1.0-f_labile(ipft))
-               csite%ssl_in(ipa) = csite%ssl_in(ipa)                                       &
-                                 + cpatch%nplant(ico) * cpatch%leaf_drop(ico)              &
-                                 * (1.0 - f_labile(ipft)) * l2n_stem / c2n_stem(ipft)
+               cpatch%leaf_drop(ico) = (1.0 - C_resorption_factor(ipft)) * delta_bleaf
 
+               csite%fsc_in(ipa) = csite%fsc_in(ipa)                                       &
+                                 + cpatch%nplant(ico) * delta_bleaf              &
+                                 * f_labile(ipft) * f_fast(ipft) 						 &
+								 * (1. - C_resorption_factor(ipft))
+               csite%fsn_in(ipa) = csite%fsn_in(ipa)                                       &
+                                 + cpatch%nplant(ico) * delta_bleaf              &
+                                 * f_labile(ipft) * f_fast(ipft) / c2n_leaf(ipft)  &
+								 * (1. - N_resorption_factor(ipft))
+               csite%ssc_in(ipa) = csite%ssc_in(ipa)                                       &
+                                 + cpatch%nplant(ico) * delta_bleaf              &
+                                 * (1.0-f_labile(ipft)) 						 &
+								 * (1. - C_resorption_factor(ipft))
+               csite%ssl_in(ipa) = csite%ssl_in(ipa)                                       &
+                                 + cpatch%nplant(ico) * delta_bleaf              &
+                                 * (1.0 - f_labile(ipft)) * l2n_stem / c2n_stem(ipft) &
+								 * (1. - C_resorption_factor(ipft))
+			   csite%slsc_in(ipa) = csite%slsc_in(ipa)	&
+			   					+ (1. - f_fast(ipft)) * delta_bleaf * f_labile(ipft) &
+								* (1. - C_resorption_factor(ipft)) *	cpatch%nplant(ico)
+			   csite%slsn_in(ipa) = csite%slsn_in(ipa)	&
+			   					+ (1. - f_fast(ipft)) * delta_bleaf * f_labile(ipft) / c2n_leaf(ipft) &
+								* (1. - N_resorption_factor(ipft)) *	cpatch%nplant(ico)
                !----- Adjust plant carbon pools. ------------------------------------------!
                cpatch%balive(ico)   = cpatch%balive(ico) - delta_bleaf
-               cpatch%bstorage(ico) = cpatch%bstorage(ico) + retained_carbon_fraction      &
+               cpatch%bstorage(ico) = cpatch%bstorage(ico) + C_resorption_factor(ipft)      &
                                     * delta_bleaf
-               !------------------------------------------------------------------------!
-               !     Update nstorage pool for resorbed N from leaf drop                 !
-               !------------------------------------------------------------------------!
-               !resorbed n from leaf drop goes into nstorage
-               N_resorbed_phenology = delta_bleaf * f_labile(ipft) / c2n_leaf(ipft)        &
-                                    * N_resorption_factor(ipft)
+			   cpatch%nstorage(ico) = cpatch%nstorage(ico) + N_resorption_factor(ipft)		&
+			   						* delta_bleaf / c2n_leaf(ipft)
+			   ! check whether nstorage reaches maximum
+			   if (cpatch%nstorage(ico) > cpatch%nstorage_min(ico) *  nstorage_max_factor) then
+			   	csite%fsn_in(ipa) = csite%fsn_in(ipa) + (cpatch%nstorage(ico) - &
+						cpatch%nstorage_min(ico) * nstorage_max_factor) * f_fast(ipft) * cpatch%nplant(ico)
+               
+			   	csite%slsn_in(ipa) = csite%slsn_in(ipa) + (cpatch%nstorage(ico) - &
+						cpatch%nstorage_min(ico) * nstorage_max_factor) * (1. - f_fast(ipft)) * cpatch%nplant(ico)
 
-               !now that we know how much N can be resorbed, put it in N storage
-                  print*,' N_resorbed_phenology', N_resorbed_phenology
-               call resorbed_N(ico,ipa,cpatch,csite,ipft,N_resorbed_phenology)
+				cpatch%nstorage(ico) = cpatch%nstorage_min(ico) *	nstorage_max_factor
+			   endif
+
+                cpatch%bleaf(ico)     = cpatch%bleaf(ico) - delta_bleaf               
                 
-               cpatch%bleaf(ico)     = bl_max
-               
-               if (cpatch%bleaf(ico) == 0.0) then
-                  !----- No leaves. -------------------------------------------------------!
+				if(cpatch%bleaf(ico) == 0.0) then
+                   !----- No leaves. -------------------------------------------------------!
                   cpatch%phenology_status(ico) = 2
-                  cpatch%elongf(ico) = 0.
                end if
-               
                cpatch%cb(13,ico)     = cpatch%cb(13,ico)     - cpatch%leaf_drop(ico)
                cpatch%cb_max(13,ico) = cpatch%cb_max(13,ico) - cpatch%leaf_drop(ico)
             !------ Becoming slightly moister again, start flushing the leaves. -----------!
 
-            elseif (cpatch%elongf(ico)            > elongf_min .and.                       &
-                    cpatch%phenology_status(ico) /= 0           ) then  
+            elseif (cpatch%elongf(ico) >= elongf_min .and. delta_bleaf < -1.0e-6) then  
                !----- Not in allometry but growing, allocate carbon in growth_balive. -----!
-               cpatch%phenology_status(ico) = 1                
+                        cpatch%phenology_status(ico) = 1
             end if
+!            if (delta_bleaf > 0.0 .and. cpatch%phenology_status(ico) < 2) then
+!               cpatch%phenology_status(ico) = -1 
+!               cpatch%leaf_drop(ico) = (1.0 - retained_carbon_fraction) * delta_bleaf
+!               csite%fsc_in(ipa) = csite%fsc_in(ipa)                                       &
+!                                 + cpatch%nplant(ico) * cpatch%leaf_drop(ico)              &
+!                                 * f_labile(ipft)
+!              csite%fsn_in(ipa) = csite%fsn_in(ipa) + cpatch%nplant(ico)                   &
+!                                 * delta_bleaf * f_labile(ipft) / c2n_leaf(ipft)           &
+ !                                * (1.0 - N_resorption_factor(ipft)) 
+!               csite%ssc_in(ipa) = csite%ssc_in(ipa)                                       &
+!                                 + cpatch%nplant(ico) * cpatch%leaf_drop(ico)              &
+!                                 * (1.0-f_labile(ipft))
+!               csite%ssl_in(ipa) = csite%ssl_in(ipa)                                       &
+!                                 + cpatch%nplant(ico) * cpatch%leaf_drop(ico)              &
+!                                 * (1.0 - f_labile(ipft)) * l2n_stem / c2n_stem(ipft)
+!
+!               !----- Adjust plant carbon pools. ------------------------------------------!
+!               cpatch%balive(ico)   = cpatch%balive(ico) - delta_bleaf
+!               cpatch%bstorage(ico) = cpatch%bstorage(ico) + retained_carbon_fraction      &
+!                                    * delta_bleaf
+!               !------------------------------------------------------------------------!
+!               !     Update nstorage pool for resorbed N from leaf drop                 !
+!               !------------------------------------------------------------------------!
+!               !resorbed n from leaf drop goes into nstorage
+!               N_resorbed_phenology = delta_bleaf * f_labile(ipft) / c2n_leaf(ipft)        &
+!                                    * N_resorption_factor(ipft)
+!
+!               !now that we know how much N can be resorbed, put it in N storage
+ !                 print*,' N_resorbed_phenology', N_resorbed_phenology
+ !              call resorbed_N(ico,ipa,cpatch,csite,ipft,N_resorbed_phenology)
+ !               
+ !              cpatch%bleaf(ico)     = bl_max
+ !              
+ !              if (cpatch%bleaf(ico) == 0.0) then
+ !                 !----- No leaves. -------------------------------------------------------!
+ !                 cpatch%phenology_status(ico) = 2
+ !                 cpatch%elongf(ico) = 0.
+ !              end if
+               
+ !              cpatch%cb(13,ico)     = cpatch%cb(13,ico)     - cpatch%leaf_drop(ico)
+ !              cpatch%cb_max(13,ico) = cpatch%cb_max(13,ico) - cpatch%leaf_drop(ico)
+  !          !------ Becoming slightly moister again, start flushing the leaves. -----------!
+
+  !          elseif (cpatch%elongf(ico)            > elongf_min .and.                       &
+  !                  cpatch%phenology_status(ico) /= 0           ) then  
+  !             !----- Not in allometry but growing, allocate carbon in growth_balive. -----!
+  !             cpatch%phenology_status(ico) = 1                
+  !          end if
 
          case (5) 
             !------------------------------------------------------------------------------!
@@ -631,8 +695,8 @@ subroutine update_phenology(doy, cpoly, isi, lat)
 
             	! update m_coef 
 !                 cpatch%m_coef(ico) = max(1e-6,min(1.0, &
-!							0.5 * 1. / (1. + (cpatch%predawn_psi_leaf(ico) / leaf_psi50(ipft)) ** 10.0) + &
-!							0.5 * 1. / (1. + (cpatch%midday_psi_leaf(ico) / leaf_psi50(ipft)) ** 10.0)    &
+!							1.0 * 1. / (1. + (cpatch%predawn_psi_leaf(ico) / leaf_psi50(ipft)) ** 10.0) + &
+!							0.0 * 1. / (1. + (cpatch%midday_psi_leaf(ico) / leaf_psi50(ipft)) ** 10.0)    &
 !							))
 				! -------------------------------------------------------
 				! -----   XXT  Calculate leaf drop or leaf onset
@@ -648,7 +712,7 @@ subroutine update_phenology(doy, cpoly, isi, lat)
 
                 if (cpatch%phenology_status(ico) /= 2) then
                           	if (low_psi_day == 10)  then ! 10day average < turgor loss point
-                               	new_elongf = max(0.0, last_elongf - 1./25.)
+                               	new_elongf = max(0.0, last_elongf - 1./20.)
                             elseif (high_psi_day == 10) then
                                 new_elongf = min(1.0, last_elongf + 1./40.)
                             endif
@@ -805,34 +869,34 @@ subroutine update_phenology(doy, cpoly, isi, lat)
 
 
 !			call cpu_time(cpu_t)
-                if(ipa == 1 .and. ico == 1) then
+                if(.false. .and. ipa==1 .and. ico == 1) then
              !           print*,'psi',t_psi
 !						print*,'avg_leaf_psi',avg_psi_leaf
 !	                    print*,'high_psi_day',high_psi_day
 !	                    print*,'low_psi_day',low_psi_day
-                        print*,'lai 23+26',sum(pack(cpatch%lai,cpatch%pft == &
-									23)) + sum(pack(cpatch%lai,cpatch%pft == 26))
-                        print*,'lai 27',sum(pack(cpatch%lai,cpatch%pft == 27))
-                        print*,'lai 24',sum(pack(cpatch%lai,cpatch%pft == 24))
-                        print*,'lai 29',sum(pack(cpatch%lai,cpatch%pft == 29))
+!                        print*,'lai 23+26',sum(pack(cpatch%lai,cpatch%pft == &
+!									23)) + sum(pack(cpatch%lai,cpatch%pft == 26))
+!                        print*,'lai 27',sum(pack(cpatch%lai,cpatch%pft == 27))
+!                        print*,'lai 24',sum(pack(cpatch%lai,cpatch%pft == 24))
+!                        print*,'lai 29',sum(pack(cpatch%lai,cpatch%pft == 29))
 !                       print*,'delta_bleaf',delta_bleaf
 !                       print*,'delta_broot',delta_bleaf
-                       print*,'bleaf',cpatch%bleaf(ico)
-                       print*,'elongf',cpatch%elongf(ico)
+!                       print*,'bleaf',cpatch%bleaf(ico)
+!                       print*,'elongf',cpatch%elongf(ico)
 !						print*,'bleaf fullness',cpatch%bleaf(ico)/bl_full
 !			!			print*,'daylight',daylight,'elongf',cpatch%elongf(ico)
-                        print*,'dbh',cpatch%dbh(ico)
-                        print*,'pft',cpatch%pft(ico)
-                        print*,'pheno_status',cpatch%phenology_status(ico)
-                        print*,'bstorage',cpatch%bstorage(ico)
-                        print*,'bstorage_min',cpatch%bstorage_min(ico)
+!                        print*,'dbh',cpatch%dbh(ico)
+!                        print*,'pft',cpatch%pft(ico)
+!                        print*,'pheno_status',cpatch%phenology_status(ico)
+!                        print*,'bstorage',cpatch%bstorage(ico)
+!                        print*,'bstorage_min',cpatch%bstorage_min(ico)
 !						print*,'nstorage',cpatch%nstorage(ico)
 !						print*,'nstorage_min',cpatch%nstorage_min(ico)
-!						print*,'co_id',cpatch%cohort_id(ico)
+!						print*,'co_id',cpatch%cohort_id
 !						print*,'hite',cpatch%hite(ico)
 !						print*,'time', cpu_t
-						print*,'midday_psi',cpatch%midday_psi_leaf(ico)
-						print*,'predawn_psi',cpatch%predawn_psi_leaf(ico)
+!						print*,'midday_psi',cpatch%midday_psi_leaf(ico)
+!						print*,'predawn_psi',cpatch%predawn_psi_leaf(ico)
 			!			print*,'pasi_psi_leaf',cpatch%past_psi_leaf(26:30,ico)
 !						print*,'soil_water',csite%soil_water(8:10,ipa)
 !						print*,'fsn',cpatch%fsn(ico)
@@ -1045,8 +1109,8 @@ subroutine resorbed_N(ico,ipa,cpatch,csite,ipft,N_resorbed_phenology)
   ! Define maximum Nstorage and update N storage pool. Once Nstorage max   !
   ! is reached, put the rest of the resorbed N into fsn_in                 !         
   !------------------------------------------------------------------------! 
-  N_resorbed_phenology =  cpatch%leaf_drop(ico) * f_labile(ipft) /         &
-                                          c2n_leaf(ipft) * resorption_factor
+!  N_resorbed_phenology =  cpatch%leaf_drop(ico) * f_labile(ipft) /         &
+!                                          c2n_leaf(ipft) * resorption_factor
 
   !define maximum Nstorage 
   nstorage_max = dbh2bl(cpatch%dbh(ico),ipft)/c2n_leaf(ipft) * nstorage_max_factor
